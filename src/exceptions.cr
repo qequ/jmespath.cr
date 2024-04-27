@@ -19,3 +19,9 @@ class ParseError < Exception
     super("#{msg}: Parse error at column #{lex_position}, token \"#{token_value}\" (#{token_type}), for expression:\n\"#{expression}\"\n#{' ' * (lex_position + 1)}^")
   end
 end
+
+class EmptyExpressionError < Exception
+  def initialize
+    super("Invalid JMESPath expression: cannot be empty.")
+  end
+end

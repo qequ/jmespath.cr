@@ -2,10 +2,6 @@ require "json"
 require "set"
 require "./exceptions"
 
-class LexerError < Exception; end
-
-class EmptyExpressionError < Exception; end
-
 class Lexer
   property current : Char? # @current can be a Char or Nil
   START_IDENTIFIER = Set.new('a'..'z') + Set.new('A'..'Z') + Set{'_'}
