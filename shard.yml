@@ -1,0 +1,9 @@
+name: jmespath
+version: 0.1.0
+
+authors:
+  - Alvaro Frias Garay <alvarofriasgaray@gmail.com>
+
+crystal: '>= 1.12.1'
+
+license: MIT
