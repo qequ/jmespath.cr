@@ -34,7 +34,7 @@ class Lexer
     @expression = ""
   end
 
-  def tokenize(expression : String) : Array((Hash(String, Char | Int32 | String | Nil) | Hash(String, Int32 | String)))
+  def tokenize(expression : String) : Array(Hash(String, Char | Int32 | String | Nil) | Hash(String, Int32 | String))
     raise EmptyExpressionError.new if expression.empty?
     @expression = expression
     @chars = @expression.chars
@@ -44,32 +44,32 @@ class Lexer
 
     tokens = [] of (Hash(String, Char | Int32 | String | Nil) | Hash(String, Int32 | String))
     while @current
-      token = case @current
-              when SIMPLE_TOKENS.keys.includes?(@current)
-                token(@current, SIMPLE_TOKENS[@current]).tap { next_char }
-              when START_IDENTIFIER.includes?(@current)
-                identifier
-              when WHITESPACE.includes?(@current)
-                next_char
-                nil
-              when '['
-                handle_bracket
-              when "'"
-                consume_raw_string_literal
-              when '|'
-                match_or_else('|', "or", "pipe")
-              when '&'
-                match_or_else('&', "and", "expref")
-              when '`'
-                consume_literal
-              when VALID_NUMBER.includes?(@current)
-                number
-              when '-'
-                negative_number
-              else
-                raise LexerError.new(@position, @current.to_s, "Unknown token #{@current}")
-              end
+      if SIMPLE_TOKENS.keys.includes?(@current)
+        token = token(@current, SIMPLE_TOKENS[@current]).tap { next_char }
+      elsif START_IDENTIFIER.includes?(@current)
+        token = identifier
+      elsif WHITESPACE.includes?(@current)
+        next_char
+        token = nil
+      elsif @current == '['
+        token = handle_bracket
+      elsif @current == "'"
+        token = consume_raw_string_literal
+      elsif @current == '|'
+        token = match_or_else('|', "or", "pipe")
+      elsif @current == '&'
+        token = match_or_else('&', "and", "expref")
+      elsif @current == '`'
+        token = consume_literal
+      elsif VALID_NUMBER.includes?(@current)
+        token = number
+      elsif @current == '-'
+        token = negative_number
+      else
+        raise LexerError.new(@position, @current.to_s, "Unknown token #{@current}")
+      end
       tokens << token if token
+      next_char unless token.nil?
     end
     tokens << eof_token unless tokens.empty? || tokens.last["type"] == "eof"
     tokens
