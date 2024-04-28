@@ -71,7 +71,6 @@ class Lexer
         raise LexerError.new(@position, @current.to_s, "Unknown token #{@current}")
       end
       tokens << token if token
-      next_char unless token.nil?
     end
     tokens << eof_token unless tokens.empty? || tokens.last["type"] == "eof"
     tokens
