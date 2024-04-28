@@ -65,6 +65,8 @@ class Lexer
         token = number
       elsif @current == '-'
         token = negative_number
+      elsif @current == '"'
+        token = consume_quoted_identifier
       else
         raise LexerError.new(@position, @current.to_s, "Unknown token #{@current}")
       end
@@ -144,6 +146,25 @@ class Lexer
     {"type" => "literal", "value" => buffer, "start" => start, "end" => @position}
   end
 
+  private def consume_quoted_identifier : Hash(String, String | Int32)
+    start = @position
+    buffer = consume_until('"')
+    begin
+      parsed_value = JSON.parse(%Q["#{buffer}"])
+      # Emsure the value is a string or Int32
+      value = case parsed_value
+              when JSON::Any
+                parsed_value.as_i? || parsed_value.as_s
+              else
+                parsed_value.to_s
+              end
+      raise LexerError.new(@position, buffer, "Invalid JSON value type") unless value
+      {"type" => "quoted_identifier", "value" => value, "start" => start, "end" => @position}
+    rescue ex : JSON::ParseException
+      raise LexerError.new(@position, buffer, "Invalid JSON format: #{ex.message}")
+    end
+  end
+
   private def consume_literal : Hash(String, String | Int32)
     start = @position
     lexeme = consume_until('`')
@@ -199,17 +220,6 @@ class Lexer
       {"type" => "number", "value" => number_string.to_i32, "start" => start, "end" => @position}
     else
       raise LexerError.new(@position, @current.to_s, "Unknown token '-'")
-    end
-  end
-
-  private def consume_quoted_identifier : Hash(String, String | Int32)
-    start = @position
-    lexeme = consume_until('"')
-    begin
-      parsed_value = JSON.parse(%Q["#{lexeme}"])
-      {"type" => "quoted_identifier", "value" => parsed_value, "start" => start, "end" => @position - start}
-    rescue ex : JSON::ParseException
-      raise LexerError.new(@position, lexeme, "Invalid JSON format: #{ex.message}")
     end
   end
 
