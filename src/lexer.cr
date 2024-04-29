@@ -164,22 +164,31 @@ class Lexer
     end
   end
 
+  private def parse_value(parsed_value)
+    case parsed_value
+    when JSON::Any
+      parsed_value.as_i? || parsed_value.as_s
+    else
+      parsed_value.to_s
+    end
+  end
+
   private def consume_literal : Hash(String, String | Int32)
     start = @position
     lexeme = consume_until('`')
     begin
       parsed_value = JSON.parse(lexeme)
-      # Ensure the value is either String or Int32
-      value = case parsed_value
-              when JSON::Any
-                parsed_value.as_i? || parsed_value.as_s
-              else
-                parsed_value.to_s
-              end
+      value = parse_value(parsed_value)
       raise LexerError.new(@position, lexeme, "Invalid JSON value type") unless value
       {"type" => "literal", "value" => value, "start" => start, "end" => @position}
     rescue ex : JSON::ParseException
-      raise LexerError.new(@position, lexeme, "Invalid JSON literal")
+      # Invalid JSON values should be converted to quoted
+      # JSON strings during the JEP-12 deprecation period.
+      # call JSON.parse with the string wrapped in double quotes
+      parsed_value = JSON.parse(%Q["#{lexeme}"])
+      value = parse_value(parsed_value)
+      raise LexerError.new(@position, lexeme, "Invalid JSON format: #{ex.message}") unless value
+      {"type" => "quoted_identifier", "value" => value, "start" => start, "end" => @position}
     end
   end
 
