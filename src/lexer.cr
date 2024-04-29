@@ -195,10 +195,10 @@ class Lexer
   private def match_or_else(expected : Char, match_type : String, else_type : String) : Hash(String, String | Int32)
     start = @position
     current = @current.to_s
-    next_char
+    nc = next_char()
     if @current == expected
       next_char
-      {"type" => match_type, "value" => "#{current}#{@current}", "start" => start, "end" => start + 1}
+      {"type" => match_type, "value" => "#{current}#{nc}", "start" => start, "end" => start + 1}
     else
       {"type" => else_type, "value" => "#{current}", "start" => start, "end" => start}
     end
