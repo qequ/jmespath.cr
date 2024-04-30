@@ -69,5 +69,23 @@ describe Lexer do
       end
       tokens.should eq(expected_tokens)
     end
+
+    it "raises an error for unknown character" do
+      expect_raises(LexerError) do
+        tokens = lexer.tokenize("foo[0^]")
+      end
+    end
+
+    it "raises an error for bad first character" do
+      expect_raises(LexerError) do
+        tokens = lexer.tokenize("^foo[0]")
+      end
+    end
+
+    it "raises an error for unknown character with identifier" do
+      expect_raises(LexerError, "Unknown token") do
+        tokens = lexer.tokenize("foo-bar")
+      end
+    end
   end
 end
