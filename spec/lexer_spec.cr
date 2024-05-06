@@ -13,35 +13,33 @@ describe Lexer do
 
     it "tokenizes unquoted identifiers" do
       tokens = lexer.tokenize("foo")
-      # primt tokens
-      puts tokens
-      puts "hello"
-      tokens.any? { |token| token["type"] == "unquoted_identifier" && token["value"] == "foo" && token["start"] == 0 && token["end"] == 3 }.should be_true
+      tokens.any? { |token| token.type == "unquoted_identifier" && token.value == "foo" && token.start == 0 && token.end == 3 }.should be_true
     end
 
     it "tokenizes number" do
       tokens = lexer.tokenize("123")
-      tokens.any? { |token| token["type"] == "number" && token["value"] == 123 && token["start"] == 0 && token["end"] == 3 }.should be_true
+      tokens.any? { |token| token.type == "number" && token.value == 123 && token.start == 0 && token.end == 3 }.should be_true
     end
 
     it "tokenized negative number" do
       tokens = lexer.tokenize("-123")
-      tokens.any? { |token| token["type"] == "number" && token["value"] == -123 && token["start"] == 0 && token["end"] == 4 }.should be_true
+      tokens.any? { |token| token.type == "number" && token.value == -123 && token.start == 0 && token.end == 4 }.should be_true
     end
 
     it "tokenizes quoted identifier" do
       tokens = lexer.tokenize("\"foo\"")
-      tokens.any? { |token| token["type"] == "quoted_identifier" && token["value"] == "foo" && token["start"] == 0 && token["end"] == 5 }.should be_true
+      tokens.any? { |token| token.type == "quoted_identifier" && token.value == "foo" && token.start == 0 && token.end == 5 }.should be_true
     end
+
     it "tokenizes dot expressions" do
       tokens = lexer.tokenize("foo.bar.baz")
       expected_tokens = [
-        {"type" => "unquoted_identifier", "value" => "foo", "start" => 0, "end" => 3},
-        {"type" => "dot", "value" => '.', "start" => 3, "end" => 4},
-        {"type" => "unquoted_identifier", "value" => "bar", "start" => 4, "end" => 7},
-        {"type" => "dot", "value" => '.', "start" => 7, "end" => 8},
-        {"type" => "unquoted_identifier", "value" => "baz", "start" => 8, "end" => 11},
-        {"type" => "eof", "value" => "", "start" => 11, "end" => 11},
+        Token.new("unquoted_identifier", "foo", 0, 3),
+        Token.new("dot", '.', 3, 4),
+        Token.new("unquoted_identifier", "bar", 4, 7),
+        Token.new("dot", '.', 7, 8),
+        Token.new("unquoted_identifier", "baz", 8, 11),
+        Token.new("eof", "", nil, nil),
       ]
       tokens.should eq(expected_tokens)
     end
@@ -49,21 +47,20 @@ describe Lexer do
     it "tokenizes complex expressions" do
       tokens = lexer.tokenize("foo.bar[*].baz | a || b")
       expected_tokens = [
-        {"type" => "unquoted_identifier", "value" => "foo", "start" => 0, "end" => 3},
-        {"type" => "dot", "value" => '.', "start" => 3, "end" => 4},
-        {"type" => "unquoted_identifier", "value" => "bar", "start" => 4, "end" => 7},
-        {"type" => "lbracket", "value" => "[", "start" => 7, "end" => 8},
-        {"type" => "star", "value" => '*', "start" => 8, "end" => 9},
-        {"type" => "rbracket", "value" => ']', "start" => 9, "end" => 10},
-        {"type" => "dot", "value" => '.', "start" => 10, "end" => 11},
-        {"type" => "unquoted_identifier", "value" => "baz", "start" => 11, "end" => 14},
-        {"type" => "pipe", "value" => "|", "start" => 15, "end" => 15},
-        {"type" => "unquoted_identifier", "value" => "a", "start" => 17, "end" => 18},
-        {"type" => "or", "value" => "||", "start" => 19, "end" => 20},
-        {"type" => "unquoted_identifier", "value" => "b", "start" => 22, "end" => 23},
-        {"type" => "eof", "value" => "", "start" => 23, "end" => 23},
+        Token.new("unquoted_identifier", "foo", 0, 3),
+        Token.new("dot", '.', 3, 4),
+        Token.new("unquoted_identifier", "bar", 4, 7),
+        Token.new("lbracket", "[", 7, 8),
+        Token.new("star", '*', 8, 9),
+        Token.new("rbracket", ']', 9, 10),
+        Token.new("dot", '.', 10, 11),
+        Token.new("unquoted_identifier", "baz", 11, 14),
+        Token.new("pipe", "|", 15, 15),
+        Token.new("unquoted_identifier", "a", 17, 18),
+        Token.new("or", "||", 19, 20),
+        Token.new("unquoted_identifier", "b", 22, 23),
+        Token.new("eof", "", nil, nil),
       ]
-      # go line by line and check if the tokens are equal
       tokens.each_with_index do |token, index|
         token.should eq(expected_tokens[index])
       end

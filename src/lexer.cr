@@ -2,6 +2,18 @@ require "json"
 require "set"
 require "./exceptions"
 
+struct Token
+  property type : String
+  property value : Char | Int32 | String | Nil
+  property start : Char | Int32 | String | Nil
+  property end : Char | Int32 | String | Nil
+
+  NULL_TOKEN = Token.new("eof", "", nil, nil)
+
+  def initialize(@type, @value, @start, @end)
+  end
+end
+
 class Lexer
   property current : Char? # @current can be a Char or Nil, initialized later
   property expression : String = ""
@@ -34,7 +46,7 @@ class Lexer
     @expression = ""
   end
 
-  def tokenize(expression : String) : Array(Hash(String, Char | Int32 | String | Nil) | Hash(String, Int32 | String))
+  def tokenize(expression : String) : Array(Token)
     raise EmptyExpressionError.new if expression.empty?
     @expression = expression
     @chars = @expression.chars
@@ -42,7 +54,7 @@ class Lexer
     @length = @expression.size
     @current = @length > 0 ? @chars[0]? : nil
 
-    tokens = [] of (Hash(String, Char | Int32 | String | Nil) | Hash(String, Int32 | String))
+    tokens = [] of Token
     while @current
       if SIMPLE_TOKENS.keys.includes?(@current)
         token = token(@current, SIMPLE_TOKENS[@current]).tap { next_char }
@@ -70,9 +82,9 @@ class Lexer
       else
         raise LexerError.new(@position, @current.to_s, "Unknown token #{@current}")
       end
-      tokens << token if token
+      tokens << Token.new(token["type"].to_s, token["value"], token["start"], token["end"]) if token
     end
-    tokens << eof_token unless tokens.empty? || tokens.last["type"] == "eof"
+    tokens << Token::NULL_TOKEN unless tokens.empty? || tokens.last.type == "eof"
     tokens
   end
 
