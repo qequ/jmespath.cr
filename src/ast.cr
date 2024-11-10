@@ -1,96 +1,96 @@
-struct Node
+struct ASTNode
   property type : String
-  property children : Array(Node)
-  property value : String | Int32 | Nil
+  property children : Array(ASTNode)
+  property value : Char | Int32 | String | Nil
 
-  def initialize(@type, @children = [] of Node, @value = nil)
+  def initialize(@type, @children = [] of ASTNode, @value = nil)
   end
 end
 
-def comparator(name : String, first : Node, second : Node)
-  Node.new("comparator", [first, second], name)
+def comparator(name : String, first : ASTNode, second : ASTNode)
+  ASTNode.new("comparator", [first, second], name)
 end
 
 def current_node
-  Node.new("current")
+  ASTNode.new("current")
 end
 
-def expref(expression : Node)
-  Node.new("expref", [expression])
+def expref(expression : ASTNode)
+  ASTNode.new("expref", [expression])
 end
 
-def function_expression(name : String, args : Array(Node))
-  Node.new("function_expression", args, name)
+def function_expression(name : String, args : Array(ASTNode))
+  ASTNode.new("function_expression", args, name)
 end
 
-def field(name : String)
-  Node.new("field", [] of Node, name)
+def field(name : Char | Int32 | String | Nil)
+  ASTNode.new("field", [] of ASTNode, name)
 end
 
-def filter_projection(left : Node, right : Node, comparator : Node)
-  Node.new("filter_projection", [left, right, comparator])
+def filter_projection(left : ASTNode, right : ASTNode, comparator : ASTNode)
+  ASTNode.new("filter_projection", [left, right, comparator])
 end
 
-def flatten(node : Node)
-  Node.new("flatten", [node])
+def flatten(node : ASTNode)
+  ASTNode.new("flatten", [node])
 end
 
 def identity
-  Node.new("identity")
+  ASTNode.new("identity")
 end
 
 def index(index : Int32)
-  Node.new("index", [] of Node, index)
+  ASTNode.new("index", [] of ASTNode, index)
 end
 
-def index_expression(children : Array(Node))
-  Node.new("index_expression", children)
+def index_expression(children : Array(ASTNode))
+  ASTNode.new("index_expression", children)
 end
 
-def key_val_pair(key_name : String, node : Node)
-  Node.new("key_val_pair", [node], key_name)
+def key_val_pair(key_name : String, node : ASTNode)
+  ASTNode.new("key_val_pair", [node], key_name)
 end
 
-def literal(literal_value : String | Int32)
-  Node.new("literal", [] of Node, literal_value)
+def literal(literal_value : Char | Int32 | String | Nil)
+  ASTNode.new("literal", [] of ASTNode, literal_value)
 end
 
-def multi_select_dict(nodes : Array(Node))
-  Node.new("multi_select_dict", nodes)
+def multi_select_dict(nodes : Array(ASTNode))
+  ASTNode.new("multi_select_dict", nodes)
 end
 
-def multi_select_list(nodes : Array(Node))
-  Node.new("multi_select_list", nodes)
+def multi_select_list(nodes : Array(ASTNode))
+  ASTNode.new("multi_select_list", nodes)
 end
 
-def or_expression(left : Node, right : Node)
-  Node.new("or_expression", [left, right])
+def or_expression(left : ASTNode, right : ASTNode)
+  ASTNode.new("or_expression", [left, right])
 end
 
-def and_expression(left : Node, right : Node)
-  Node.new("and_expression", [left, right])
+def and_expression(left : ASTNode, right : ASTNode)
+  ASTNode.new("and_expression", [left, right])
 end
 
-def not_expression(expr : Node)
-  Node.new("not_expression", [expr])
+def not_expression(expr : ASTNode)
+  ASTNode.new("not_expression", [expr])
 end
 
-def pipe(left : Node, right : Node)
-  Node.new("pipe", [left, right])
+def pipe(left : ASTNode, right : ASTNode)
+  ASTNode.new("pipe", [left, right])
 end
 
-def projection(left : Node, right : Node)
-  Node.new("projection", [left, right])
+def projection(left : ASTNode, right : ASTNode)
+  ASTNode.new("projection", [left, right])
 end
 
-def subexpression(children : Array(Node))
-  Node.new("subexpression", children)
+def subexpression(children : Array(ASTNode))
+  ASTNode.new("subexpression", children)
 end
 
-def slice(start : Node, _end : Node, step : Node)
-  Node.new("slice", [start, _end, step])
+def slice(start : ASTNode, _end : ASTNode, step : ASTNode)
+  ASTNode.new("slice", [start, _end, step])
 end
 
-def value_projection(left : Node, right : Node)
-  Node.new("value_projection", [left, right])
+def value_projection(left : ASTNode, right : ASTNode)
+  ASTNode.new("value_projection", [left, right])
 end
