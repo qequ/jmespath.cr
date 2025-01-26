@@ -49,7 +49,7 @@ class Parser
 
     parsed_result = do_parse(expression)
     @cache[expression] = parsed_result
-    #free_cache_entries if @cache.size > MAX_SIZE
+    # free_cache_entries if @cache.size > MAX_SIZE
     parsed_result
   end
 
@@ -62,6 +62,10 @@ class Parser
   private def parse_expression(expression : String) : ParsedResult
     lexer = Lexer.new
     @tokens = lexer.tokenize(expression)
+    # iterate over the tokens and print them
+    @tokens.each do |token|
+      puts "token: #{token.type} - #{token.value}"
+    end
     @index = 0
     parsed = parse_expression_bp(0)
     if @index < @tokens.size
@@ -79,9 +83,21 @@ class Parser
         break
       end
       @index += 1
-      #left = left.led(self, token)
+      left = parse_left_denotation(left, token)
     end
     left
+  end
+
+  private def parse_left_denotation(left : ASTNode, token : Token) : ASTNode
+    case token.type
+    when "dot"
+      right = parse_expression_bp(BINDING_POWER["dot"])
+      ASTNode.new("subexpression", [left, right])
+    when "eof"
+      left
+    else
+      raise Exception.new("Unexpected token type: #{token.type}")
+    end
   end
 
   private def parse_null_denotation : ASTNode
