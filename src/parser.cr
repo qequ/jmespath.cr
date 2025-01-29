@@ -166,10 +166,21 @@ class Parser
       right = index_expression
       project_if_slice(left, right)
     else
-      @index += 1 # consume star
-      @index += 1 # consume rbracket
-      right = parse_projection_rhs(BINDING_POWER["star"])
-      projection(left, right)
+      if current_token.type == "star"
+        @index += 1 # consume star
+        @index += 1 # consume rbracket
+        # Instead of getting projection_rhs, we'll use the next field directly
+        if lookahead(0) == "dot"
+          @index += 1 # consume dot
+          right = parse_dot_rhs(BINDING_POWER["dot"])
+          projection(left, right)
+        else
+          # For cases without a following dot
+          projection(left, identity)
+        end
+      else
+        raise ParseError.new(0, current_token.value.to_s, current_token.type, "Expected star or number in bracket operation")
+      end
     end
   end
 
@@ -298,15 +309,18 @@ class Parser
   end
 
   private def or_expression(left : ASTNode)
-    raise "Not implemented: or_expression"
+    right = parse_expression_bp(BINDING_POWER["or"])
+    or_expression(left, right)
   end
 
   private def and_expression(left : ASTNode)
-    raise "Not implemented: and_expression"
+    right = parse_expression_bp(BINDING_POWER["and"])
+    and_expression(left, right)
   end
 
   private def comparator_expression(left : ASTNode, comparator : String)
-    raise "Not implemented: comparator_expression"
+    right = parse_expression_bp(BINDING_POWER[comparator])
+    comparator(comparator, left, right)
   end
 
   private def flatten_projection(left : ASTNode)

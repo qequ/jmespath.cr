@@ -115,7 +115,7 @@ class TreeInterpreter < Visitor
   end
 
   def visit_identity(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_identity not implemented")
+    value
   end
 
   def visit_index(node : ASTNode, value : JSON::Any) : JSON::Any
@@ -159,11 +159,19 @@ class TreeInterpreter < Visitor
   end
 
   def visit_or_expression(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_or_expression not implemented")
+    left = visit(node.children[0], value)
+    return left unless is_false(left)
+
+    right = visit(node.children[1], value)
+    right
   end
 
   def visit_and_expression(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_and_expression not implemented")
+    left = visit(node.children[0], value)
+    return JSON::Any.new(nil) if is_false(left)
+
+    right = visit(node.children[1], value)
+    right
   end
 
   def visit_not_expression(node : ASTNode, value : JSON::Any) : JSON::Any
@@ -175,7 +183,20 @@ class TreeInterpreter < Visitor
   end
 
   def visit_projection(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_projection not implemented")
+    base = visit(node.children[0], value)
+
+    # Check if base is an array
+    array = base.as_a?
+    return JSON::Any.new(nil) unless array
+
+    # Collect results
+    collected = array.compact_map do |element|
+      current = visit(node.children[1], element)
+      # Only include non-null values
+      current unless current.raw.nil?
+    end
+
+    JSON::Any.new(collected)
   end
 
   def visit_value_projection(node : ASTNode, value : JSON::Any) : JSON::Any
@@ -189,10 +210,19 @@ class TreeInterpreter < Visitor
   end
 
   private def is_false(value : JSON::Any) : Bool
-    value.raw.nil? ||
-      (value.raw.is_a?(String) && value.raw.empty?) ||
-      (value.raw.is_a?(Array) && value.raw.empty?) ||
-      (value.raw.is_a?(Hash) && value.raw.empty?) ||
-      value.raw == false
+    case raw = value.raw
+    when Nil
+      true
+    when String
+      raw.empty?
+    when Array
+      raw.empty?
+    when Hash
+      raw.empty?
+    when Bool
+      !raw
+    else
+      false
+    end
   end
 end
