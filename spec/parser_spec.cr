@@ -39,4 +39,33 @@ describe Parser do
 
     result.search(json_data).as_s.should eq("baz")
   end
+
+  it "parses and evaluates triple dot expressions" do
+    parser = Parser.new
+    result = parser.parse("foo.bar.baz")
+
+    # Test the evaluation
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new({
+        "bar" => JSON::Any.new({
+          "baz" => JSON::Any.new("qux"),
+        }),
+      }),
+    })
+
+    result.search(json_data).as_s.should eq("qux")
+  end
+
+  it "parses and evaluates array index expressions" do
+    parser = Parser.new
+    result = parser.parse("data[1]")
+
+    # Test the evaluation
+    array_data = [10, 20, 30].map { |n| JSON::Any.new(n.to_i64) }
+    json_data = JSON::Any.new({
+      "data" => JSON::Any.new(array_data),
+    })
+
+    result.search(json_data).as_i.should eq(20)
+  end
 end
