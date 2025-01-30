@@ -93,9 +93,20 @@ class TreeInterpreter < Visitor
   end
 
   def visit_literal(node : ASTNode, value : JSON::Any) : JSON::Any
-    # JSON::Any.new(node.value)
-    # JSON::Any.new(node.value)
-    JSON::Any.new(nil)
+    case node_value = node.value
+    when Int32
+      JSON::Any.new(node_value.to_i64)
+    when String
+      JSON::Any.new(node_value)
+    when Char
+      JSON::Any.new(node_value.to_s)
+    when Float64
+      JSON::Any.new(node_value)
+    when Bool
+      JSON::Any.new(node_value)
+    else
+      JSON::Any.new(nil)
+    end
   end
 
   def visit_expref(node : ASTNode, value : JSON::Any) : JSON::Any
@@ -143,7 +154,30 @@ class TreeInterpreter < Visitor
   end
 
   def visit_slice(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_slice not implemented")
+    # Check if value is an array
+    array = value.as_a?
+    return JSON::Any.new(nil) unless array
+
+    # Get slice parameters from children nodes
+    start = visit(node.children[0], value).as_i?
+    stop = visit(node.children[1], value).as_i?
+    step = visit(node.children[2], value).as_i? || 1
+
+    # Create sliced array
+    begin
+      start_idx = start || 0
+      end_idx = stop || array.size
+
+      # Get the slice and then filter by step
+      result = [] of JSON::Any
+      array[start_idx...end_idx].each_with_index do |element, index|
+        result << element if index % step == 0
+      end
+
+      JSON::Any.new(result)
+    rescue IndexError
+      JSON::Any.new([] of JSON::Any)
+    end
   end
 
   def visit_key_val_pair(node : ASTNode, value : JSON::Any) : JSON::Any

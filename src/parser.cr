@@ -155,70 +155,93 @@ class Parser
 
   private def parse_bracket_expression : ASTNode
     if ["number", "colon"].includes?(lookahead(0))
-      index_expression
+      index_expression([parse_index_expression])
     else
       parse_multi_select_list
     end
   end
 
+  private def parse_index_expression : ASTNode
+    # Check if we're looking at a slice or simple index
+    if lookahead(0) == "colon" || lookahead(1) == "colon"
+      parse_slice
+    else
+      # Simple index case like [1]
+      index_token = current_token
+      match("number")
+      index_value = index_token.value.as(Int32)
+      match("rbracket")
+      index(index_value)
+    end
+  end
+
   private def parse_bracket_operation(left : ASTNode) : ASTNode
     if ["number", "colon"].includes?(lookahead(0))
-      right = index_expression
-      project_if_slice(left, right)
+      right = parse_index_expression
+      # Check if we got a slice or index
+      if right.type == "slice"
+        projection(
+          index_expression([left, right]),
+          identity
+        )
+      else
+        index_expression([left, right])
+      end
     else
       if current_token.type == "star"
         @index += 1 # consume star
-        @index += 1 # consume rbracket
-        # Instead of getting projection_rhs, we'll use the next field directly
+        match("rbracket")
         if lookahead(0) == "dot"
           @index += 1 # consume dot
           right = parse_dot_rhs(BINDING_POWER["dot"])
+          # Create direct projection instead of wrapping in subexpression
           projection(left, right)
         else
-          # For cases without a following dot
           projection(left, identity)
         end
       else
-        raise ParseError.new(0, current_token.value.to_s, current_token.type, "Expected star or number in bracket operation")
+        raise ParseError.new(0, current_token.value.to_s,
+          current_token.type, "Invalid bracket operation")
       end
     end
   end
 
   private def project_if_slice(left : ASTNode, right : ASTNode) : ASTNode
     if right.type == "slice"
-      projection(index_expression([left, right]), parse_projection_rhs(BINDING_POWER["star"]))
+      # Create proper projection with AST module's index_expression
+      projection(
+        index_expression([left, right]),
+        identity
+      )
     else
       index_expression([left, right])
     end
   end
 
-  private def index_expression(children = nil)
-    children ||= begin
-      if lookahead(0) == "colon"
-        parse_slice
-      else
-        [index(current_token.value.as(Int32))].tap { @index += 1; match("rbracket") }
-      end
-    end
-    ASTNode.new("index_expression", children)
-  end
-
-  private def parse_slice : Array(ASTNode)
-    parts = [nil, nil, nil] of ASTNode?
+  private def parse_slice : ASTNode
+    parts = [nil, nil, nil] of Int32?
     index = 0
+
     while current_token.type != "rbracket" && index < 3
       if current_token.type == "colon"
         index += 1
         @index += 1
       elsif current_token.type == "number"
-        parts[index] = literal(current_token.value)
+        parts[index] = current_token.value.as(Int32)
         @index += 1
       else
-        raise ParseError.new(0, current_token.value.to_s, current_token.type, "Invalid slice")
+        raise ParseError.new(0, current_token.value.to_s,
+          current_token.type, "Invalid slice syntax")
       end
     end
     match("rbracket")
-    parts.map { |p| p || literal(nil) }
+
+    # Convert to AST nodes with proper null handling
+    start = parts[0] ? literal(parts[0]) : literal(nil)
+    _end = parts[1] ? literal(parts[1]) : literal(nil)
+    step = parts[2] ? literal(parts[2]) : literal(nil)
+
+    slice(start, _end, step)
   end
 
   private def parse_multi_select_list : ASTNode
