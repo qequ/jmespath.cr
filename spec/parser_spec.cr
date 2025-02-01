@@ -138,4 +138,86 @@ describe Parser do
     result[0].as_s.should eq("baz")
     result[1].as_s.should eq("qux")
   end
+
+  it "parses and evaluates single-level flatten" do
+    parser = Parser.new
+    result = parser.parse("foo[]")
+
+    # Test the parsed structure
+    result.parsed.type.should eq("projection")
+    result.parsed.children.size.should eq(2)
+    result.parsed.children[0].type.should eq("flatten")
+    result.parsed.children[0].children[0].type.should eq("field")
+    result.parsed.children[0].children[0].value.should eq("foo")
+    result.parsed.children[1].type.should eq("identity")
+
+    # Create nested JSON::Any structure
+    inner_arrays = [
+      [
+        ["one", "two"].map { |s| JSON::Any.new(s) },
+        ["three", "four"].map { |s| JSON::Any.new(s) },
+      ].map { |arr| JSON::Any.new(arr) },
+      [
+        ["five", "six"].map { |s| JSON::Any.new(s) },
+        ["seven", "eight"].map { |s| JSON::Any.new(s) },
+      ].map { |arr| JSON::Any.new(arr) },
+      [
+        ["nine"].map { |s| JSON::Any.new(s) },
+        ["ten"].map { |s| JSON::Any.new(s) },
+      ].map { |arr| JSON::Any.new(arr) },
+    ].map { |arr| JSON::Any.new(arr) }
+
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(inner_arrays),
+    })
+
+    # Test the flattened result
+    flattened = result.search(json_data).as_a
+    flattened.size.should eq(6)
+
+    flattened[0].as_a.map(&.as_s).should eq(["one", "two"])
+    flattened[1].as_a.map(&.as_s).should eq(["three", "four"])
+    flattened[2].as_a.map(&.as_s).should eq(["five", "six"])
+    flattened[3].as_a.map(&.as_s).should eq(["seven", "eight"])
+    flattened[4].as_a.map(&.as_s).should eq(["nine"])
+    flattened[5].as_a.map(&.as_s).should eq(["ten"])
+  end
+
+  it "parses and evaluates flatten followed by index" do
+    parser = Parser.new
+    result = parser.parse("foo[][0]")
+
+    # Test the parsed structure
+    result.parsed.type.should eq("projection")
+    result.parsed.children.size.should eq(2)
+    result.parsed.children[0].type.should eq("flatten")
+    result.parsed.children[1].type.should eq("index_expression")
+
+    # Create nested JSON::Any structure
+    inner_arrays = [
+      [
+        ["one", "two"].map { |s| JSON::Any.new(s) },
+        ["three", "four"].map { |s| JSON::Any.new(s) },
+      ].map { |arr| JSON::Any.new(arr) },
+      [
+        ["five", "six"].map { |s| JSON::Any.new(s) },
+        ["seven", "eight"].map { |s| JSON::Any.new(s) },
+      ].map { |arr| JSON::Any.new(arr) },
+      [
+        ["nine"].map { |s| JSON::Any.new(s) },
+        ["ten"].map { |s| JSON::Any.new(s) },
+      ].map { |arr| JSON::Any.new(arr) },
+    ].map { |arr| JSON::Any.new(arr) }
+
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(inner_arrays),
+    })
+
+    # Test the result
+    final_array = result.search(json_data).as_a
+    final_array.size.should eq(6)
+    final_array.map(&.as_s).should eq(
+      ["one", "three", "five", "seven", "nine", "ten"]
+    )
+  end
 end

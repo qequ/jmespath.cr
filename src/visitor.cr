@@ -122,7 +122,20 @@ class TreeInterpreter < Visitor
   end
 
   def visit_flatten(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_flatten not implemented")
+    base = visit(node.children[0], value)
+    array = base.as_a?
+    return JSON::Any.new([] of JSON::Any) unless array
+
+    merged_list = [] of JSON::Any
+    array.each do |element|
+      if elem_array = element.as_a?
+        merged_list.concat(elem_array)
+      else
+        merged_list << element
+      end
+    end
+
+    JSON::Any.new(merged_list)
   end
 
   def visit_identity(node : ASTNode, value : JSON::Any) : JSON::Any

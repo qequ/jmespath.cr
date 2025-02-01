@@ -100,7 +100,7 @@ class Parser
     when "filter"              then filter_projection(identity)
     when "lbrace"              then parse_multi_select_hash
     when "lparen"              then parse_paren_expression
-    when "flatten"             then flatten_projection
+    when "flatten"             then nud_flatten_projection
     when "current"             then current_node
     when "expref"              then expref_expression
     when "lbracket"            then parse_bracket_expression
@@ -118,7 +118,7 @@ class Parser
     when "and"  then and_expression(left)
     when "eq", "ne", "gt", "lt", "gte", "lte"
       comparator_expression(left, token.type)
-    when "flatten"  then flatten_projection(left)
+    when "flatten"  then led_flatten_projection(left)
     when "lbracket" then parse_bracket_operation(left)
     when "lparen"   then function_expression(left)
     when "filter"   then filter_projection(left)
@@ -269,10 +269,28 @@ class Parser
   end
 
   private def parse_projection_rhs(bp : Int32) : ASTNode
-    if BINDING_POWER[current_token.type]? || 0 < PROJECTION_STOP
-      identity
-    else
+    # Same approach as python's _parse_projection_rhs:
+    # If next token's binding power < 10, we stop the projection => identity
+    if (BINDING_POWER[current_token.type]? || 0) < PROJECTION_STOP
+      return identity
+    end
+
+    case current_token.type
+    when "lbracket"
+      # e.g. foo[][0], or foo[][1:2], etc.
       parse_expression_bp(bp)
+    when "filter"
+      parse_expression_bp(bp)
+    when "dot"
+      advance # consume the 'dot'
+      parse_dot_rhs(bp)
+    else
+      raise ParseError.new(
+        0,
+        current_token.value.to_s,
+        current_token.type,
+        "syntax error in projection"
+      )
     end
   end
 
@@ -315,8 +333,10 @@ class Parser
     raise "Not implemented: parse_paren_expression"
   end
 
-  private def flatten_projection
-    raise "Not implemented: flatten_projection"
+  private def nud_flatten_projection : ASTNode
+    flatten_node = flatten(identity)
+    right = parse_projection_rhs(BINDING_POWER["flatten"])
+    projection(flatten_node, right)
   end
 
   private def expref_expression
@@ -346,8 +366,10 @@ class Parser
     comparator(comparator, left, right)
   end
 
-  private def flatten_projection(left : ASTNode)
-    raise "Not implemented: flatten_projection with argument"
+  private def led_flatten_projection(left : ASTNode) : ASTNode
+    flatten_node = flatten(left)
+    right = parse_projection_rhs(BINDING_POWER["flatten"])
+    projection(flatten_node, right)
   end
 
   private def function_expression(left : ASTNode)
