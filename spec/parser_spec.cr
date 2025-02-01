@@ -274,4 +274,39 @@ describe Parser do
     })
     result.search(json_data).as_bool.should eq(true)
   end
+
+  it "parses and evaluates not expressions" do
+    parser = Parser.new
+    result = parser.parse("!foo")
+
+    # Test the parsed structure
+    result.parsed.type.should eq("not_expression")
+    result.parsed.children.size.should eq(1)
+    result.parsed.children[0].type.should eq("field")
+    result.parsed.children[0].value.should eq("foo")
+
+    # Test with true value
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(true),
+    })
+    result.search(json_data).as_bool.should eq(false)
+
+    # Test with false value
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(false),
+    })
+    result.search(json_data).as_bool.should eq(true)
+
+    # Test with null/nil value
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(nil),
+    })
+    result.search(json_data).as_bool.should eq(true)
+
+    # Test with non-existent key
+    json_data = JSON::Any.new({
+      "bar" => JSON::Any.new(true),
+    })
+    result.search(json_data).as_bool.should eq(true)
+  end
 end

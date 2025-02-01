@@ -222,7 +222,8 @@ class TreeInterpreter < Visitor
   end
 
   def visit_not_expression(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_not_expression not implemented")
+    original_result = visit(node.children[0], value)
+    JSON::Any.new(is_false(original_result))
   end
 
   def visit_pipe(node : ASTNode, value : JSON::Any) : JSON::Any

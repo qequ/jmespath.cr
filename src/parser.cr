@@ -344,7 +344,8 @@ class Parser
   end
 
   private def not_expression
-    raise "Not implemented: not_expression"
+    expr = parse_expression_bp(BINDING_POWER["not"])
+    not_expression(expr)
   end
 
   private def pipe_expression(left : ASTNode)
