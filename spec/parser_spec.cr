@@ -309,4 +309,29 @@ describe Parser do
     })
     result.search(json_data).as_bool.should eq(true)
   end
+
+  it "parses and evaluates pipe expressions" do
+    parser = Parser.new
+
+    # Test basic pipe expression
+    result = parser.parse("foo | [0]")
+
+    # Test evaluation with array
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new([10, 20, 30].map { |n| JSON::Any.new(n.to_i64) }),
+    })
+    result.search(json_data).as_i.should eq(10)
+
+    # Test chained pipe expressions
+    result = parser.parse("foo | [0] | bar")
+
+    # Test evaluation with nested data
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new([
+        {"bar" => JSON::Any.new("first")},
+        {"bar" => JSON::Any.new("second")},
+      ].map { |h| JSON::Any.new(h) }),
+    })
+    result.search(json_data).as_s.should eq("first")
+  end
 end

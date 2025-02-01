@@ -349,7 +349,8 @@ class Parser
   end
 
   private def pipe_expression(left : ASTNode)
-    raise "Not implemented: pipe_expression"
+    right = parse_expression_bp(BINDING_POWER["pipe"])
+    pipe(left, right)
   end
 
   private def or_expression(left : ASTNode)
