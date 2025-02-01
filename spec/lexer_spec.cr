@@ -55,9 +55,9 @@ describe Lexer do
         Token.new("rbracket", ']', 9, 10),
         Token.new("dot", '.', 10, 11),
         Token.new("unquoted_identifier", "baz", 11, 14),
-        Token.new("pipe", "|", 15, 15),
+        Token.new("pipe", "|", 15, 16),
         Token.new("unquoted_identifier", "a", 17, 18),
-        Token.new("or", "||", 19, 20),
+        Token.new("or", "||", 19, 21),
         Token.new("unquoted_identifier", "b", 22, 23),
         Token.new("eof", "", nil, nil),
       ]

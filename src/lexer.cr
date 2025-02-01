@@ -71,6 +71,14 @@ class Lexer
         token = match_or_else('|', "or", "pipe")
       elsif @current == '&'
         token = match_or_else('&', "and", "expref")
+      elsif @current == '<'
+        token = match_or_else('=', "lte", "lt")
+      elsif @current == '>'
+        token = match_or_else('=', "gte", "gt")
+      elsif @current == '!'
+        token = match_or_else('=', "ne", "not")
+      elsif @current == '='
+        token = equal_sign
       elsif @current == '`'
         token = consume_literal
       elsif VALID_NUMBER.includes?(@current)
@@ -206,13 +214,13 @@ class Lexer
 
   private def match_or_else(expected : Char, match_type : String, else_type : String) : Hash(String, String | Int32)
     start = @position
-    current = @current.to_s
-    nc = next_char()
-    if @current == expected
+    value = @current.to_s
+    nc = next_char
+    if nc == expected
       next_char
-      {"type" => match_type, "value" => "#{current}#{nc}", "start" => start, "end" => start + 1}
+      {"type" => match_type, "value" => "#{value}#{expected}", "start" => start, "end" => @position}
     else
-      {"type" => else_type, "value" => "#{current}", "start" => start, "end" => start}
+      {"type" => else_type, "value" => value, "start" => start, "end" => start + 1}
     end
   end
 
@@ -249,6 +257,7 @@ class Lexer
       next_char
       {"type" => "eq", "value" => "==", "start" => start, "end" => @position}
     else
+      # If we're at the EOF, we never advanced the position
       position = @current.nil? ? @position : @position - 1
       raise LexerError.new(position, "=", "Unknown token '='")
     end
