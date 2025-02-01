@@ -275,6 +275,28 @@ describe Parser do
     result.search(json_data).as_bool.should eq(true)
   end
 
+  it "parses and evaluates standalone star expression" do
+    parser = Parser.new
+    result = parser.parse("*")
+
+    # Test the parsed structure
+    result.parsed.type.should eq("value_projection")
+    result.parsed.children.size.should eq(2)
+    result.parsed.children[0].type.should eq("identity")
+    result.parsed.children[1].type.should eq("identity")
+
+    # Test evaluation with object
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(10),
+      "bar" => JSON::Any.new(20),
+      "baz" => JSON::Any.new(30),
+    })
+
+    search_result = result.search(json_data).as_a
+    search_result.size.should eq(3)
+    search_result.map(&.as_i).sort.should eq([10, 20, 30])
+  end
+
   it "parses and evaluates not expressions" do
     parser = Parser.new
     result = parser.parse("!foo")

@@ -321,8 +321,14 @@ class Parser
     raise "Not implemented: quoted_field"
   end
 
-  private def star_projection
-    raise "Not implemented: star_projection"
+  private def star_projection : ASTNode
+    left = identity
+    right = if current_token.type == "rbracket"
+              identity
+            else
+              parse_projection_rhs(BINDING_POWER["star"])
+            end
+    value_projection(left, right)
   end
 
   private def filter_projection(node : ASTNode)

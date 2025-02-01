@@ -251,7 +251,21 @@ class TreeInterpreter < Visitor
   end
 
   def visit_value_projection(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_value_projection not implemented")
+    # Get base value
+    base = visit(node.children[0], value)
+
+    # Try to get hash values, return nil if not a hash
+    hash = base.as_h?
+    return JSON::Any.new(nil) unless hash
+
+    # Collect results from hash values
+    collected = hash.values.compact_map do |element|
+      current = visit(node.children[1], element)
+      # Only include non-null values
+      current unless current.raw.nil?
+    end
+
+    JSON::Any.new(collected)
   end
 
   # Add other visit methods following the same pattern...
