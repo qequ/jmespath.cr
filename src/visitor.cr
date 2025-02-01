@@ -202,7 +202,16 @@ class TreeInterpreter < Visitor
   end
 
   def visit_multi_select_list(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_multi_select_list not implemented")
+    # Return nil if input value is nil
+    return JSON::Any.new(nil) if value.raw.nil?
+
+    # Collect results from all children
+    collected = node.children.map do |child|
+      visit(child, value)
+    end
+
+    # Return array of collected results
+    JSON::Any.new(collected)
   end
 
   def visit_or_expression(node : ASTNode, value : JSON::Any) : JSON::Any

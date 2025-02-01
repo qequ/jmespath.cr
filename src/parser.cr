@@ -155,7 +155,16 @@ class Parser
   private def parse_bracket_expression : ASTNode
     if ["number", "colon"].includes?(lookahead(0))
       index_expression([parse_index_expression])
+      # If we see star followed by rbracket => it's a projection from identity
+    elsif lookahead(0) == "star" && lookahead(1) == "rbracket"
+      advance # consume 'star'
+      advance # consume 'rbracket'
+      # Now parse the RHS of the projection
+      right = parse_projection_rhs(BINDING_POWER["star"])
+      # Return a projection node from 'identity' to whatever 'right' is
+      projection(identity, right)
     else
+      # Otherwise, it's a multi-select-list
       parse_multi_select_list
     end
   end

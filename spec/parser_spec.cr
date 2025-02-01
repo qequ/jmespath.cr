@@ -388,6 +388,30 @@ describe Parser do
     result.search(json_data).as_s.should eq("value")
   end
 
+  it "parses and evaluates multi-select list expressions" do
+    parser = Parser.new
+    parsed_result = parser.parse("foo.[bar, baz]")
+
+    # Test the parsed structure
+    # Test evaluation
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new({
+        "bar" => JSON::Any.new(1),
+        "baz" => JSON::Any.new(2),
+        "qux" => JSON::Any.new(3),
+      }),
+    })
+
+    search_result = parsed_result.search(json_data).as_a
+    search_result.size.should eq(2)
+    search_result[0].as_i.should eq(1)
+    search_result[1].as_i.should eq(2)
+
+    # Test with nil value
+    json_data = JSON::Any.new(nil)
+    parsed_result.search(json_data).raw.should be_nil
+  end
+
   # test boolean experssion (a || b) && c
   it "parses and evaluates boolean expressions" do
     parser = Parser.new
@@ -406,6 +430,49 @@ describe Parser do
       "c" => JSON::Any.new(false),
     })
     result.search(json_data).as_bool.should eq(false)
+  end
+
+  it "parses and evaluates array projections with missing fields" do
+    parser = Parser.new
+    result = parser.parse("[*].foo")
+
+    # Test evaluation with all objects having 'foo'
+    json_data = JSON::Any.new([
+      {"foo" => JSON::Any.new(1)},
+      {"foo" => JSON::Any.new(2)},
+      {"foo" => JSON::Any.new(3)},
+    ].map { |h| JSON::Any.new(h) })
+
+    search_result = result.search(json_data).as_a
+    search_result.size.should eq(3)
+    search_result.map(&.as_i).should eq([1, 2, 3])
+
+    # Test evaluation with missing 'foo' field
+    json_data = JSON::Any.new([
+      {"foo" => JSON::Any.new(1)},
+      {"foo" => JSON::Any.new(2)},
+      {"bar" => JSON::Any.new(3)},
+    ].map { |h| JSON::Any.new(h) })
+
+    search_result = result.search(json_data).as_a
+    search_result.size.should eq(2)
+    search_result.map(&.as_i).should eq([1, 2])
+  end
+
+  it "parses and evaluates multi-select list on objects" do
+    parser = Parser.new
+    result = parser.parse("[foo, bar]")
+
+    # Test evaluation with simple object
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new("a"),
+      "bar" => JSON::Any.new("b"),
+      "baz" => JSON::Any.new("c"),
+    })
+
+    search_result = result.search(json_data).as_a
+    search_result.size.should eq(2)
+    search_result.map(&.as_s).should eq(["a", "b"])
   end
 
   # now parse a || (b && c)
