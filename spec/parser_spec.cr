@@ -220,4 +220,58 @@ describe Parser do
       ["one", "three", "five", "seven", "nine", "ten"]
     )
   end
+
+  it "parses and evaluates comparator expressions" do
+    parser = Parser.new
+
+    # Test greater than
+    result = parser.parse("foo > bar")
+    result.parsed.type.should eq("comparator")
+    result.parsed.value.should eq("gt")
+    result.parsed.children.size.should eq(2)
+    result.parsed.children[0].type.should eq("field")
+    result.parsed.children[0].value.should eq("foo")
+    result.parsed.children[1].type.should eq("field")
+    result.parsed.children[1].value.should eq("bar")
+
+    # Test numeric comparison
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(3),
+      "bar" => JSON::Any.new(2),
+    })
+    result.search(json_data).as_bool.should eq(true)
+
+    # Test less than or equal
+    result = parser.parse("foo <= bar")
+    result.parsed.type.should eq("comparator")
+    result.parsed.value.should eq("lte")
+
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new(2),
+      "bar" => JSON::Any.new(2),
+    })
+    result.search(json_data).as_bool.should eq(true)
+
+    # Test equality
+    result = parser.parse("foo == bar")
+    result.parsed.type.should eq("comparator")
+    result.parsed.value.should eq("eq")
+
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new("value"),
+      "bar" => JSON::Any.new("value"),
+    })
+    result.search(json_data).as_bool.should eq(true)
+
+    # Test not equals
+    result = parser.parse("foo != bar")
+    result.parsed.type.should eq("comparator")
+    result.parsed.value.should eq("ne")
+
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new("value1"),
+      "bar" => JSON::Any.new("value2"),
+    })
+    result.search(json_data).as_bool.should eq(true)
+  end
 end
