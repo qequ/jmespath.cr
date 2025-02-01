@@ -82,8 +82,7 @@ class Parser
       break if token.type == "eof" # Add explicit EOF check
 
       current_bp = BINDING_POWER[token.type]? || 0
-      break if current_bp < min_bp
-
+      break if current_bp <= min_bp
       @index += 1
       left = parse_left_denotation(left, token)
     end
@@ -335,8 +334,10 @@ class Parser
     raise "Not implemented: filter_projection"
   end
 
-  private def parse_paren_expression
-    raise "Not implemented: parse_paren_expression"
+  private def parse_paren_expression : ASTNode
+    expr = parse_expression_bp(0)
+    match("rparen") # This consumes the closing ")"
+    expr
   end
 
   private def nud_flatten_projection : ASTNode
@@ -380,7 +381,36 @@ class Parser
     projection(flatten_node, right)
   end
 
-  private def function_expression(left : ASTNode)
-    raise "Not implemented: function_expression"
+  private def function_expression(left : ASTNode) : ASTNode
+    # Verify left node is a field type
+    unless left.type == "field"
+      # Look at the token two positions back for error message
+      prev_token = @tokens[@index - 2]?
+      raise ParseError.new(
+        0,
+        prev_token.try(&.value).to_s,
+        prev_token.try(&.type).to_s,
+        "Invalid function name '#{prev_token.try(&.value)}'"
+      )
+    end
+
+    # Get function name from field node
+    name = left.value.to_s
+    args = [] of ASTNode
+
+    # Parse arguments until we hit closing parenthesis
+    while current_token.type != "rparen"
+      # Parse each argument expression
+      expression = parse_expression_bp(0)
+      # If we see a comma, consume it and continue
+      match("comma") if current_token.type == "comma"
+      args << expression
+    end
+
+    # Consume the closing parenthesis
+    match("rparen")
+
+    # Create and return function node
+    function_expression(name, args)
   end
 end

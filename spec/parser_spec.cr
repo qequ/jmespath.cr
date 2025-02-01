@@ -356,4 +356,75 @@ describe Parser do
     })
     result.search(json_data).as_s.should eq("first")
   end
+
+  it "parses and evaluates expressions with parentheses" do
+    parser = Parser.new
+    result = parser.parse("(foo).bar")
+
+    # Test the parsed structure
+    result.parsed.type.should eq("subexpression")
+    result.parsed.children.size.should eq(2)
+    result.parsed.children[0].type.should eq("field")
+    result.parsed.children[0].value.should eq("foo")
+    result.parsed.children[1].type.should eq("field")
+    result.parsed.children[1].value.should eq("bar")
+
+    # Test evaluation
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new({
+        "bar" => JSON::Any.new("baz"),
+      }),
+    })
+    result.search(json_data).as_s.should eq("baz")
+
+    # Test nested parentheses
+    result = parser.parse("((foo))")
+    result.parsed.type.should eq("field")
+    result.parsed.value.should eq("foo")
+
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new("value"),
+    })
+    result.search(json_data).as_s.should eq("value")
+  end
+
+  # test boolean experssion (a || b) && c
+  it "parses and evaluates boolean expressions" do
+    parser = Parser.new
+    result = parser.parse("(a || b) && c")
+
+    # Test the parsed structure
+    result.parsed.type.should eq("and_expression")
+    result.parsed.children.size.should eq(2)
+    result.parsed.children[0].type.should eq("or_expression")
+    result.parsed.children[1].type.should eq("field")
+
+    # Test the evaluation
+    json_data = JSON::Any.new({
+      "a" => JSON::Any.new(false),
+      "b" => JSON::Any.new(true),
+      "c" => JSON::Any.new(false),
+    })
+    result.search(json_data).as_bool.should eq(false)
+  end
+
+  # now parse a || (b && c)
+  it "parses and evaluates boolean expressions with precedence" do
+    parser = Parser.new
+    result = parser.parse("a || (b && c)")
+
+    # Test the parsed structure
+    result.parsed.type.should eq("or_expression")
+    result.parsed.children.size.should eq(2)
+    result.parsed.children[0].type.should eq("field")
+    result.parsed.children[1].type.should eq("and_expression")
+
+    # Test the evaluation
+    json_data = JSON::Any.new({
+      "a" => JSON::Any.new(false),
+      "b" => JSON::Any.new(true),
+      "c" => JSON::Any.new(false),
+    })
+    result.search(json_data).as_bool.should eq(false)
+  end
 end
