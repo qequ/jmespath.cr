@@ -125,8 +125,6 @@ class TreeInterpreter < Visitor
     array = base.as_a?
     return JSON::Any.new(nil) unless array
 
-    puts "array: #{array}"
-
     # Get filter condition node
     comparator_node = node.children[2]
 
@@ -216,11 +214,21 @@ class TreeInterpreter < Visitor
   end
 
   def visit_key_val_pair(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_key_val_pair not implemented")
+    visit(node.children[0], value)
   end
 
   def visit_multi_select_dict(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_multi_select_dict not implemented")
+    # Return nil if input value is nil
+    return JSON::Any.new(nil) if value.raw.nil?
+
+    # Build hash of selected values
+    collected = {} of String => JSON::Any
+    node.children.each do |child|
+      collected[child.value.to_s] = visit(child, value)
+    end
+
+    # Return collected hash as JSON::Any
+    JSON::Any.new(collected)
   end
 
   def visit_multi_select_list(node : ASTNode, value : JSON::Any) : JSON::Any

@@ -456,6 +456,27 @@ describe Parser do
     result.search(json_data).raw.should be_nil
   end
 
+  it "parses and evaluates multi-select dict expressions" do
+    parser = Parser.new
+    result = parser.parse("{foo: foo, bar: bar}")
+
+    # Test evaluation with object
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new("foo_val"),
+      "bar" => JSON::Any.new("bar_val"),
+      "baz" => JSON::Any.new("baz_val"),
+    })
+
+    search_result = result.search(json_data).as_h
+    search_result.size.should eq(2)
+    search_result["foo"].as_s.should eq("foo_val")
+    search_result["bar"].as_s.should eq("bar_val")
+
+    # Test with nil value
+    json_data = JSON::Any.new(nil)
+    result.search(json_data).raw.should be_nil
+  end
+
   # test boolean experssion (a || b) && c
   it "parses and evaluates boolean expressions" do
     parser = Parser.new
