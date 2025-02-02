@@ -96,7 +96,7 @@ class Parser
     when "unquoted_identifier" then field(token.value)
     when "quoted_identifier"   then quoted_field(token)
     when "star"                then star_projection
-    when "filter"              then filter_projection(identity)
+    when "filter"              then nud_filter_projection
     when "lbrace"              then parse_multi_select_hash
     when "lparen"              then parse_paren_expression
     when "flatten"             then nud_flatten_projection
@@ -120,7 +120,7 @@ class Parser
     when "flatten"  then led_flatten_projection(left)
     when "lbracket" then parse_bracket_operation(left)
     when "lparen"   then function_expression(left)
-    when "filter"   then filter_projection(left)
+    when "filter"   then led_filter_projection(left)
     else
       raise ParseError.new(0, token.value.to_s, token.type, "Unexpected left token: #{token.type}")
     end
@@ -354,8 +354,25 @@ class Parser
     value_projection(left, right)
   end
 
-  private def filter_projection(node : ASTNode)
-    raise "Not implemented: filter_projection"
+  private def nud_filter_projection : ASTNode
+    # Filter starting from identity node
+    led_filter_projection(identity)
+  end
+
+  private def led_filter_projection(left : ASTNode) : ASTNode
+    # Parse filter condition
+    condition = parse_expression_bp(0)
+    match("rbracket")
+
+    # Determine right side of projection
+    right = if current_token.type == "flatten"
+              identity
+            else
+              parse_projection_rhs(BINDING_POWER["filter"])
+            end
+
+    # Create filter projection node
+    filter_projection(left, right, condition)
   end
 
   private def parse_paren_expression : ASTNode

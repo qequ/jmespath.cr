@@ -118,7 +118,29 @@ class TreeInterpreter < Visitor
   end
 
   def visit_filter_projection(node : ASTNode, value : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("visit_filter_projection not implemented")
+    # Get base value
+    base = visit(node.children[0], value)
+
+    # Return nil if base is not an array
+    array = base.as_a?
+    return JSON::Any.new(nil) unless array
+
+    puts "array: #{array}"
+
+    # Get filter condition node
+    comparator_node = node.children[2]
+
+    # Collect results that match the filter condition
+    collected = array.compact_map do |element|
+      # Only include elements where condition is true
+      if is_true(visit(comparator_node, element))
+        current = visit(node.children[1], element)
+        # Filter out nil values
+        current unless current.raw.nil?
+      end
+    end
+
+    JSON::Any.new(collected)
   end
 
   def visit_flatten(node : ASTNode, value : JSON::Any) : JSON::Any

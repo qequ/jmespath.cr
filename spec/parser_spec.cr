@@ -431,6 +431,31 @@ describe Parser do
     end
   end
 
+  it "parses and evaluates filter expressions" do
+    parser = Parser.new
+    result = parser.parse("foo[?bar > `1`]")
+
+    # Create test data
+    json_data = JSON::Any.new({
+      "foo" => JSON::Any.new([
+        {"bar" => JSON::Any.new(0)},
+        {"bar" => JSON::Any.new(1)},
+        {"bar" => JSON::Any.new(2)},
+        {"bar" => JSON::Any.new(3)},
+        {"baz" => JSON::Any.new(4)}, # Missing bar field
+      ].map { |h| JSON::Any.new(h) }),
+    })
+
+    # Test filter evaluation
+    search_result = result.search(json_data).as_a
+    search_result.size.should eq(2)
+    search_result.map { |r| r["bar"].as_i }.should eq([2, 3])
+
+    # Test with non-array input
+    json_data = JSON::Any.new({"foo" => JSON::Any.new("not-an-array")})
+    result.search(json_data).raw.should be_nil
+  end
+
   # test boolean experssion (a || b) && c
   it "parses and evaluates boolean expressions" do
     parser = Parser.new
