@@ -412,6 +412,25 @@ describe Parser do
     parsed_result.search(json_data).raw.should be_nil
   end
 
+  it "handles quoted identifiers correctly" do
+    parser = Parser.new
+
+    # Test quoted field access
+    result = parser.parse("\"foo-bar\"")
+    result.parsed.type.should eq("field")
+    result.parsed.value.should eq("foo-bar")
+
+    json_data = JSON::Any.new({
+      "foo-bar" => JSON::Any.new("value"),
+    })
+    result.search(json_data).as_s.should eq("value")
+
+    # Test quoted field as function name (should fail)
+    expect_raises(ParseError, "Quoted identifier not allowed for function names.") do
+      parser.parse("\"foo\"()")
+    end
+  end
+
   # test boolean experssion (a || b) && c
   it "parses and evaluates boolean expressions" do
     parser = Parser.new

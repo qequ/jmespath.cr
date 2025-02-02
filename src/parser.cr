@@ -325,8 +325,23 @@ class Parser
     token
   end
 
-  private def quoted_field(token : Token)
-    raise "Not implemented: quoted_field"
+  private def quoted_field(token : Token) : ASTNode
+    # Create field node with token value
+    field_node = field(token.value)
+
+    # Check if next token is left parenthesis (function call)
+    if current_token.type == "lparen"
+      # Look at current token for error message
+      t = current_token
+      raise ParseError.new(
+        0,
+        t.value.to_s,
+        t.type,
+        "Quoted identifier not allowed for function names."
+      )
+    end
+
+    field_node
   end
 
   private def star_projection : ASTNode

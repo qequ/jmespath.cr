@@ -25,18 +25,3 @@ class EmptyExpressionError < Exception
     super("Invalid JMESPath expression: cannot be empty.")
   end
 end
-
-class IncompleteExpressionError < ParseError
-  def set_expression(expression : String)
-    @expression = expression
-    @lex_position = expression.size
-    @token_type = ""
-    @token_value = ""
-  end
-
-  def to_s : String
-    underline = ' ' * (@lex_position + 1) + '^'
-    "Invalid jmespath expression: Incomplete expression:\n" +
-      "\"#{@expression}\"" + "\n" + underline
-  end
-end
