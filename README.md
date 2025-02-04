@@ -9,7 +9,7 @@ A Crystal implementation of [JMESPath](https://jmespath.org/), a query language 
    ```yaml
    dependencies:
      jmespath:
-       github: qequ/jmespath
+       github: qequ/jmespath.cr
    ```
 
 2. Run `shards install`
