@@ -1,6 +1,9 @@
 name: jmespath
 version: 0.1.0
 
+description: |
+  A Crystal implementation of JMESPath - JSON Query Language
+
 authors:
   - Alvaro Frias Garay <alvarofriasgaray@gmail.com>
 
