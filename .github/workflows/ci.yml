@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
@@ -29,3 +30,32 @@ jobs:
 
     - name: Run static analysis
       run: crystal build --no-codegen src/jmespath.cr
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: latest
+    
+    - name: Install dependencies
+      run: shards install
+    
+    - name: Build release
+      run: |
+        crystal build --release --static src/jmespath.cr -o jmespath
+        tar -czf jmespath-${GITHUB_REF#refs/tags/}.tar.gz jmespath
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: jmespath-*.tar.gz
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
