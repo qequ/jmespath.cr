@@ -107,6 +107,14 @@ class Lexer
     @current
   end
 
+  private def peek_char : Char?
+    if @position + 1 < @length
+      @chars[@position + 1]
+    else
+      nil
+    end
+  end
+
   private def identifier : Token
     start = @position
     buffer = String.build do |str|
@@ -135,54 +143,97 @@ class Lexer
     end
   end
 
-  private def consume_until(delimiter : Char) : String
-    start = @position
-    buffer = String.build do |str|
-      next_char # Skip the opening delimiter
-      while @current != delimiter && @current != nil
-        if @current == '\\'
-          next_char               # Skip the escape character
-          str << (@current || "") # Append the next character, safely handle nil
-        else
-          str << @current
-        end
-        next_char
-      end
-
-      raise LexerError.new(@position, str.to_s, "Unclosed literal for delimiter '#{delimiter}'", @expression) if @current != delimiter
-    end
-
-    next_char # Move past the closing delimiter
-    buffer.to_s
-  end
-
-  private def consume_raw_string_literal : Token
-    start = @position
-    buffer = consume_until('\'')
-    Token.new("literal", buffer, start, @position, JSON::Any.new(buffer))
-  end
-
+  # Quoted identifiers ("..."): preserve all content verbatim including
+  # backslash sequences so JSON.parse handles the escapes.
   private def consume_quoted_identifier : Token
     start = @position
-    buffer = consume_until('"')
+    buffer = String.build do |str|
+      next_char # skip opening "
+      while @current != nil
+        if @current == '\\' # preserve escape sequences verbatim for JSON.parse
+          str << '\\'
+          next_char
+          str << (@current || "")
+          next_char
+        elsif @current == '"'
+          break
+        else
+          str << @current
+          next_char
+        end
+      end
+      raise LexerError.new(@position, str.to_s, "Unclosed \" delimiter", @expression) if @current != '"'
+    end
+    next_char # skip closing "
+
     begin
-      parsed_value = JSON.parse(%Q["#{buffer}"])
-      value = case parsed_value
-              when JSON::Any
-                parsed_value.as_i? || parsed_value.as_s
-              else
-                parsed_value.to_s
-              end
-      raise LexerError.new(@position, buffer, "Invalid JSON value type", @expression) unless value
+      parsed_value = JSON.parse(%("#{buffer}"))
+      value = parsed_value.as_s
       Token.new("quoted_identifier", value, start, @position)
     rescue ex : JSON::ParseException
-      raise LexerError.new(@position, buffer, "Invalid JSON format: #{ex.message}", @expression)
+      raise LexerError.new(start, buffer.to_s, "Invalid quoted identifier: #{ex.message}", @expression)
     end
   end
 
+  # Raw string literals ('...'): only \' and \\ are escape sequences.
+  # Everything else is literal, including other backslashes.
+  private def consume_raw_string_literal : Token
+    start = @position
+    buffer = String.build do |str|
+      next_char # skip opening '
+      while @current != nil
+        if @current == '\\' && peek_char == '\\'
+          # \\ in raw string produces literal \\
+          str << '\\'
+          str << '\\'
+          next_char
+          next_char
+        elsif @current == '\\' && peek_char == '\''
+          # \' in raw string produces literal '
+          next_char # skip backslash
+          str << '\''
+          next_char
+        elsif @current == '\''
+          break
+        else
+          str << @current
+          next_char
+        end
+      end
+      raise LexerError.new(@position, str.to_s, "Unclosed ' delimiter", @expression) if @current != '\''
+    end
+    next_char # skip closing '
+
+    Token.new("literal", buffer.to_s, start, @position, JSON::Any.new(buffer.to_s))
+  end
+
+  # Backtick literals (`...`): only \` and \\ are escape sequences.
+  # Everything else is passed verbatim to JSON.parse.
   private def consume_literal : Token
     start = @position
-    lexeme = consume_until('`')
+    buffer = String.build do |str|
+      next_char # skip opening `
+      while @current != nil
+        if @current == '\\' && peek_char == '`'
+          next_char # skip backslash
+          str << '`'
+          next_char
+        elsif @current == '\\' && peek_char == '\\'
+          next_char # skip first backslash
+          str << '\\'
+          next_char
+        elsif @current == '`'
+          break
+        else
+          str << @current
+          next_char
+        end
+      end
+      raise LexerError.new(@position, str.to_s, "Unclosed ` delimiter", @expression) if @current != '`'
+    end
+    next_char # skip closing `
+
+    lexeme = buffer.to_s
     begin
       parsed_json = JSON.parse(lexeme)
       Token.new("literal", lexeme, start, @position, parsed_json)
