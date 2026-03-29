@@ -167,7 +167,13 @@ class Parser
 
   private def parse_bracket_expression : Node
     if ["number", "colon"].includes?(lookahead(0))
-      IndexExpressionNode.new([parse_index_expression])
+      right = parse_index_expression
+      if right.type == "slice"
+        rhs = parse_projection_rhs(BINDING_POWER["star"])
+        ProjectionNode.new(right, rhs)
+      else
+        IndexExpressionNode.new([right])
+      end
     elsif lookahead(0) == "star" && lookahead(1) == "rbracket"
       advance # consume 'star'
       advance # consume 'rbracket'
@@ -194,9 +200,10 @@ class Parser
     if ["number", "colon"].includes?(lookahead(0))
       right = parse_index_expression
       if right.type == "slice"
+        rhs = parse_projection_rhs(BINDING_POWER["star"])
         ProjectionNode.new(
           IndexExpressionNode.new([left, right]),
-          IdentityNode.new
+          rhs
         )
       else
         IndexExpressionNode.new([left, right])
@@ -215,9 +222,12 @@ class Parser
     parts = [nil, nil, nil] of Int32?
     index = 0
 
-    while current_token.type != "rbracket" && index < 3
+    while current_token.type != "rbracket"
       if current_token.type == "colon"
         index += 1
+        if index > 2
+          raise parse_error(current_token, "Too many colons in slice expression")
+        end
         @index += 1
       elsif current_token.type == "number"
         parts[index] = current_token.value.as(Int32)
@@ -235,7 +245,13 @@ class Parser
     expressions = [] of Node
     while current_token.type != "rbracket"
       expressions << parse_expression_bp(0)
-      match("comma") if current_token.type == "comma"
+      if current_token.type == "comma"
+        match("comma")
+        # Trailing comma check
+        if current_token.type == "rbracket"
+          raise parse_error(current_token, "Unexpected token after comma in multi-select list")
+        end
+      end
     end
     match("rbracket")
     MultiSelectListNode.new(expressions)
@@ -243,13 +259,22 @@ class Parser
 
   private def parse_multi_select_hash : Node
     pairs = [] of KeyValPairNode
+    if current_token.type == "rbrace"
+      raise parse_error(current_token, "Empty multi-select hash not allowed")
+    end
     while current_token.type != "rbrace"
       key_token = current_token
       match(["quoted_identifier", "unquoted_identifier"])
       match("colon")
       value = parse_expression_bp(0)
       pairs << KeyValPairNode.new(key_token.value.to_s, value)
-      match("comma") if current_token.type == "comma"
+      if current_token.type == "comma"
+        match("comma")
+        # Trailing comma check
+        if current_token.type == "rbrace"
+          raise parse_error(current_token, "Unexpected token after comma in multi-select hash")
+        end
+      end
     end
     match("rbrace")
     MultiSelectHashNode.new(pairs)

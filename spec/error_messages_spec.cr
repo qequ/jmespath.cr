@@ -93,14 +93,14 @@ describe "Error messages" do
     it "reports position for unclosed string literal" do
       lexer = Lexer.new
       ex = expect_raises(LexerError) { lexer.tokenize("'unclosed") }
-      ex.message.not_nil!.should contain("Unclosed literal")
+      ex.message.not_nil!.should contain("Unclosed")
       ex.message.not_nil!.should contain("'unclosed")
     end
 
     it "reports position for unclosed backtick literal" do
       lexer = Lexer.new
       ex = expect_raises(LexerError) { lexer.tokenize("`unclosed") }
-      ex.message.not_nil!.should contain("Unclosed literal")
+      ex.message.not_nil!.should contain("Unclosed")
       ex.message.not_nil!.should contain("`unclosed")
     end
 

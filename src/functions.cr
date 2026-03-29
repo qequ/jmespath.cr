@@ -255,7 +255,7 @@ class FunctionRuntime
       v
     when String
       begin
-        if raw.includes?(".")
+        if raw.includes?(".") || raw.includes?("e") || raw.includes?("E")
           JSON::Any.new(raw.to_f64)
         else
           JSON::Any.new(raw.to_i64)

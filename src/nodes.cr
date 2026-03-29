@@ -179,7 +179,7 @@ class AndExpressionNode < Node
 
   def visit(v : JSON::Any) : JSON::Any
     left = @left.visit(v)
-    return JSON::Any.new(nil) if is_false(left)
+    return left if is_false(left)
     @right.visit(v)
   end
 
@@ -230,10 +230,10 @@ class ComparatorNode < Node
                  when "gt"  then lf > rf
                  when "lte" then lf <= rf
                  when "gte" then lf >= rf
-                 else            false
+                 else            nil
                  end
                else
-                 false
+                 nil
                end
              end
 
@@ -353,7 +353,7 @@ class FlattenNode < Node
   def visit(v : JSON::Any) : JSON::Any
     base = @child.visit(v)
     array = base.as_a?
-    return JSON::Any.new([] of JSON::Any) unless array
+    return JSON::Any.new(nil) unless array
 
     merged = [] of JSON::Any
     array.each do |element|
@@ -406,7 +406,7 @@ class SliceNode < Node
 
     len = array.size
     step = @step || 1
-    return JSON::Any.new([] of JSON::Any) if step == 0
+    raise ArgumentError.new("Invalid value: slice step cannot be 0") if step == 0
 
     start_idx = compute_start(len, step)
     stop_idx = compute_stop(len, step)
