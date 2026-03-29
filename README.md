@@ -1,6 +1,6 @@
 # JMESPath.cr
 
-A Crystal implementation of [JMESPath](https://jmespath.org/), a query language for JSON. JMESPath allows you to declaratively extract elements from complex JSON documents.
+A fully compliant Crystal implementation of [JMESPath](https://jmespath.org/), a query language for JSON. JMESPath allows you to declaratively extract elements from complex JSON documents.
 
 ## Installation
 
@@ -91,7 +91,7 @@ JMESPath.search("map(&name, people)", data) # => ["bob", "alice"]
 
 ## Features
 
-The library supports most JMESPath expressions including:
+Full JMESPath specification support including:
 - Basic field access
 - Array indexing and slicing
 - List and hash projections
@@ -106,29 +106,9 @@ The library supports most JMESPath expressions including:
 
 ## TODO
 
-The following features are still pending implementation:
-
-1. ~~Built-in Functions~~ (done in v0.3.0)
-
-2. ~~Expression References (expref)~~ (done in v0.3.0)
-
-3. JMESPath Compliance
-   - Need to implement comprehensive compliance test suite
-   - Verify behavior matches official JMESPath specification
-
-4. Options Implementation
-   - Add support for runtime configuration options
-   - Implementation of custom function registration
-
-5. Caching System Improvements
-   - Current basic caching system for parsed expressions
-   - Need to add cache size limits and eviction policies
-
-6. Performance Optimizations
-   - Optimize parser for large expressions
-   - Add benchmarking suite
-
-7. ~~Error Handling Improvements~~ (done in v0.3.0)
+- Options Implementation: runtime configuration, custom function registration
+- Caching System Improvements: cache size limits and eviction policies
+- Performance Optimizations: benchmarking suite
 
 ## Development
 
