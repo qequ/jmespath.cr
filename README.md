@@ -33,7 +33,7 @@ JMESPath.search("people[*].age", data) # => [20, 25, 30]
 
 # Filters
 data = %({"people": [
-  {"name": "bob", "age": 20}, 
+  {"name": "bob", "age": 20},
   {"name": "alice", "age": 25}
 ]})
 JMESPath.search("people[?age > `20`].name", data) # => ["alice"]
@@ -42,6 +42,52 @@ JMESPath.search("people[?age > `20`].name", data) # => ["alice"]
 data = %({"foo": {"bar": "baz", "qux": "quux"}})
 JMESPath.search("foo.{b: bar, q: qux}", data) # => {"b": "baz", "q": "quux"}
 ```
+
+### Built-in Functions
+
+```crystal
+# String functions
+JMESPath.search("length(foo)", %({"foo": "hello"}))           # => 5
+JMESPath.search("starts_with(foo, 'hel')", %({"foo": "hello"})) # => true
+JMESPath.search("join(', ', foo)", %({"foo": ["a", "b", "c"]})) # => "a, b, c"
+
+# Array functions
+JMESPath.search("sort(foo)", %({"foo": [3, 1, 2]}))     # => [1, 2, 3]
+JMESPath.search("reverse(foo)", %({"foo": [1, 2, 3]}))  # => [3, 2, 1]
+JMESPath.search("contains(foo, `2`)", %({"foo": [1, 2, 3]})) # => true
+
+# Number functions
+JMESPath.search("sum(foo)", %({"foo": [1, 2, 3]}))  # => 6
+JMESPath.search("avg(foo)", %({"foo": [10, 20, 30]})) # => 20.0
+JMESPath.search("abs(foo)", %({"foo": -5}))          # => 5
+
+# Object functions
+JMESPath.search("keys(foo)", %({"foo": {"a": 1, "b": 2}}))   # => ["a", "b"]
+JMESPath.search("values(foo)", %({"foo": {"a": 1, "b": 2}})) # => [1, 2]
+
+# Type conversion
+JMESPath.search("to_string(foo)", %({"foo": 42}))    # => "42"
+JMESPath.search("to_number(foo)", %({"foo": "42"}))   # => 42
+JMESPath.search("type(foo)", %({"foo": "hello"}))     # => "string"
+```
+
+### Expression References (expref)
+
+The `&` operator creates a reference to an expression that is evaluated later by functions like `sort_by`, `max_by`, `min_by`, and `map`:
+
+```crystal
+# Sort by a field
+data = %({"people": [{"name": "bob", "age": 30}, {"name": "alice", "age": 25}]})
+JMESPath.search("sort_by(people, &age)[*].name", data) # => ["alice", "bob"]
+
+# Find max/min by expression
+JMESPath.search("max_by(people, &age).name", data) # => "bob"
+JMESPath.search("min_by(people, &age).name", data) # => "alice"
+
+# Map an expression over an array
+JMESPath.search("map(&name, people)", data) # => ["bob", "alice"]
+```
+
 
 ## Features
 
@@ -54,17 +100,17 @@ The library supports most JMESPath expressions including:
 - Pipe expressions
 - Literal values
 - Comparisons and logical operators
+- Expression references (`&expr`) for deferred evaluation
+- 26 built-in functions: `abs`, `avg`, `ceil`, `contains`, `ends_with`, `floor`, `join`, `keys`, `length`, `map`, `max`, `max_by`, `merge`, `min`, `min_by`, `not_null`, `reverse`, `sort`, `sort_by`, `starts_with`, `sum`, `to_array`, `to_number`, `to_string`, `type`, `values`
+- Informative error messages with expression context and caret pointing to the error position
 
 ## TODO
 
 The following features are still pending implementation:
 
-1. Built-in Functions
-   - No built-in functions are currently implemented
-   - Need to add support for string, array, number manipulation functions
+1. ~~Built-in Functions~~ (done in v0.3.0)
 
-2. Expression References (expref)
-   - The `&` operator for function references is not implemented
+2. ~~Expression References (expref)~~ (done in v0.3.0)
 
 3. JMESPath Compliance
    - Need to implement comprehensive compliance test suite
@@ -82,9 +128,7 @@ The following features are still pending implementation:
    - Optimize parser for large expressions
    - Add benchmarking suite
 
-7. Error Handling Improvements
-   - More detailed error messages
-   - Better error recovery strategies
+7. ~~Error Handling Improvements~~ (done in v0.3.0)
 
 ## Development
 

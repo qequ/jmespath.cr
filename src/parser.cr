@@ -5,6 +5,7 @@ require "./parsed_result"
 
 class Parser
   @cache : Hash(String, ParsedResult)
+  @expression : String = ""
 
   BINDING_POWER = {
     "eof"                 => 0,
@@ -61,6 +62,7 @@ class Parser
   end
 
   private def parse_expression(expression : String) : ParsedResult
+    @expression = expression
     lexer = Lexer.new
     @tokens = lexer.tokenize(expression)
     @index = 0
@@ -68,7 +70,7 @@ class Parser
 
     if @index < @tokens.size && current_token.type != "eof"
       t = current_token
-      raise ParseError.new(0, t.value.to_s, t.type, "Unexpected token: #{t.value}")
+      raise parse_error(t, "Unexpected token after expression: #{t.value}")
     end
 
     ParsedResult.new(expression, parsed)
@@ -116,7 +118,7 @@ class Parser
     when "not"
       parse_not_expression
     else
-      raise ParseError.new(0, token.value.to_s, token.type, "Unexpected token: #{token.type}")
+      raise parse_error(token, "Unexpected token: #{token.type}")
     end
   end
 
@@ -133,7 +135,7 @@ class Parser
     when "lparen"   then parse_function_expression(left)
     when "filter"   then parse_led_filter_projection(left)
     else
-      raise ParseError.new(0, token.value.to_s, token.type, "Unexpected left token: #{token.type}")
+      raise parse_error(token, "Unexpected token: #{token.type}")
     end
   end
 
@@ -159,7 +161,7 @@ class Parser
       @index += 1
       parse_multi_select_hash
     else
-      raise ParseError.new(0, current_token.value.to_s, current_token.type, "Invalid dot RHS")
+      raise parse_error(current_token, "Expected identifier, star, bracket, or brace after dot")
     end
   end
 
@@ -205,8 +207,7 @@ class Parser
       right = parse_projection_rhs(BINDING_POWER["star"])
       ProjectionNode.new(left, right)
     else
-      raise ParseError.new(0, current_token.value.to_s,
-        current_token.type, "Invalid bracket operation")
+      raise parse_error(current_token, "Expected number, colon, or star in bracket expression")
     end
   end
 
@@ -222,8 +223,7 @@ class Parser
         parts[index] = current_token.value.as(Int32)
         @index += 1
       else
-        raise ParseError.new(0, current_token.value.to_s,
-          current_token.type, "Invalid slice syntax")
+        raise parse_error(current_token, "Expected number or colon in slice expression")
       end
     end
     match("rbracket")
@@ -269,19 +269,14 @@ class Parser
       advance # consume the 'dot'
       parse_dot_rhs(bp)
     else
-      raise ParseError.new(
-        0,
-        current_token.value.to_s,
-        current_token.type,
-        "syntax error in projection"
-      )
+      raise parse_error(current_token, "Expected dot, bracket, or filter after projection")
     end
   end
 
   private def match(expected_types : String | Array(String))
     expected = expected_types.is_a?(String) ? [expected_types] : expected_types
     unless expected.includes?(current_token.type)
-      raise ParseError.new(0, current_token.value.to_s, current_token.type,
+      raise parse_error(current_token,
         "Expected #{expected.join(" or ")}, got #{current_token.type}")
     end
     @index += 1 if current_token.type != "eof"
@@ -305,13 +300,7 @@ class Parser
     field_node = FieldNode.new(token.value.to_s)
 
     if current_token.type == "lparen"
-      t = current_token
-      raise ParseError.new(
-        0,
-        t.value.to_s,
-        t.type,
-        "Quoted identifier not allowed for function names."
-      )
+      raise parse_error(token, "Quoted identifier not allowed for function names.")
     end
 
     field_node
@@ -395,12 +384,8 @@ class Parser
   private def parse_function_expression(left : Node) : Node
     unless left.type == "field"
       prev_token = @tokens[@index - 2]?
-      raise ParseError.new(
-        0,
-        prev_token.try(&.value).to_s,
-        prev_token.try(&.type).to_s,
-        "Invalid function name '#{prev_token.try(&.value)}'"
-      )
+      raise parse_error(prev_token || current_token,
+        "Invalid function name '#{prev_token.try(&.value)}'")
     end
 
     name = left.value.to_s
@@ -415,5 +400,18 @@ class Parser
     match("rparen")
 
     FunctionExpressionNode.new(name, args)
+  end
+
+  # Extracts the start position from a token as Int32
+  private def token_position(token : Token) : Int32
+    case pos = token.start
+    when Int32 then pos
+    else            0
+    end
+  end
+
+  # Creates a ParseError with the correct position and expression context
+  private def parse_error(token : Token, msg : String) : ParseError
+    ParseError.new(token_position(token), token.value.to_s, token.type, msg, @expression)
   end
 end

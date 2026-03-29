@@ -90,7 +90,7 @@ class Lexer
       elsif @current == '"'
         tokens << consume_quoted_identifier
       else
-        raise LexerError.new(@position, @current.to_s, "Unknown token #{@current}")
+        raise LexerError.new(@position, @current.to_s, "Unknown token '#{@current}'", @expression)
       end
     end
     tokens << Token::NULL_TOKEN unless tokens.empty? || tokens.last.type == "eof"
@@ -149,7 +149,7 @@ class Lexer
         next_char
       end
 
-      raise LexerError.new(@position, str.to_s, "Unclosed literal for delimiter '#{delimiter}'") if @current != delimiter
+      raise LexerError.new(@position, str.to_s, "Unclosed literal for delimiter '#{delimiter}'", @expression) if @current != delimiter
     end
 
     next_char # Move past the closing delimiter
@@ -173,10 +173,10 @@ class Lexer
               else
                 parsed_value.to_s
               end
-      raise LexerError.new(@position, buffer, "Invalid JSON value type") unless value
+      raise LexerError.new(@position, buffer, "Invalid JSON value type", @expression) unless value
       Token.new("quoted_identifier", value, start, @position)
     rescue ex : JSON::ParseException
-      raise LexerError.new(@position, buffer, "Invalid JSON format: #{ex.message}")
+      raise LexerError.new(@position, buffer, "Invalid JSON format: #{ex.message}", @expression)
     end
   end
 
@@ -227,7 +227,7 @@ class Lexer
       number_string = "-" + consume_number
       Token.new("number", number_string.to_i32, start, @position)
     else
-      raise LexerError.new(@position, @current.to_s, "Unknown token '-'")
+      raise LexerError.new(@position, @current.to_s, "Unknown token '-'", @expression)
     end
   end
 
@@ -238,7 +238,7 @@ class Lexer
       Token.new("eq", "==", start, @position)
     else
       position = @current.nil? ? @position : @position - 1
-      raise LexerError.new(position, "=", "Unknown token '='")
+      raise LexerError.new(position, "=", "Unknown token '='", @expression)
     end
   end
 end
