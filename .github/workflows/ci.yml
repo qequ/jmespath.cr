@@ -10,7 +10,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
 
@@ -25,35 +24,58 @@ jobs:
     - name: Run tests
       run: crystal spec
 
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: latest
+
     - name: Check formatting
       run: crystal tool format --check
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: latest
+
+    - name: Install dependencies
+      run: shards install
 
     - name: Run static analysis
       run: crystal build --no-codegen src/jmespath.cr
 
   release:
-    needs: test
+    needs: [test, format, static-analysis]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Install Crystal
       uses: crystal-lang/install-crystal@v1
       with:
         crystal: latest
-    
+
     - name: Install dependencies
       run: shards install
-    
+
     - name: Build release
       run: |
         crystal build --release --static src/jmespath.cr -o jmespath
         tar -czf jmespath-${GITHUB_REF#refs/tags/}.tar.gz jmespath
-    
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
