@@ -54,17 +54,17 @@ The library supports most JMESPath expressions including:
 - Pipe expressions
 - Literal values
 - Comparisons and logical operators
+- Expression references (`&expr`) for deferred evaluation
+- 26 built-in functions: `abs`, `avg`, `ceil`, `contains`, `ends_with`, `floor`, `join`, `keys`, `length`, `map`, `max`, `max_by`, `merge`, `min`, `min_by`, `not_null`, `reverse`, `sort`, `sort_by`, `starts_with`, `sum`, `to_array`, `to_number`, `to_string`, `type`, `values`
+- Informative error messages with expression context and caret pointing to the error position
 
 ## TODO
 
 The following features are still pending implementation:
 
-1. Built-in Functions
-   - No built-in functions are currently implemented
-   - Need to add support for string, array, number manipulation functions
+1. ~~Built-in Functions~~ (done in v0.3.0)
 
-2. Expression References (expref)
-   - The `&` operator for function references is not implemented
+2. ~~Expression References (expref)~~ (done in v0.3.0)
 
 3. JMESPath Compliance
    - Need to implement comprehensive compliance test suite
@@ -82,9 +82,7 @@ The following features are still pending implementation:
    - Optimize parser for large expressions
    - Add benchmarking suite
 
-7. Error Handling Improvements
-   - More detailed error messages
-   - Better error recovery strategies
+7. ~~Error Handling Improvements~~ (done in v0.3.0)
 
 ## Development
 
