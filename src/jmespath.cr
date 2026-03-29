@@ -6,7 +6,7 @@ require "./parser"
 require "./parsed_result"
 
 module JMESPath
-  VERSION = "0.1.0"
+  VERSION = "0.2.0"
 
   # Main entry point for JMESPath expressions
   #
