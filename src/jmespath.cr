@@ -1,9 +1,8 @@
 require "json"
 require "./lexer"
 require "./exceptions"
-require "./ast"
+require "./nodes"
 require "./parser"
-require "./visitor"
 require "./parsed_result"
 
 module JMESPath

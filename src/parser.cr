@@ -1,6 +1,6 @@
 require "./lexer"
 require "./exceptions"
-require "./ast"
+require "./nodes"
 require "./parsed_result"
 
 class Parser
@@ -66,7 +66,6 @@ class Parser
     @index = 0
     parsed = parse_expression_bp(0)
 
-    # Only raise error if there are non-EOF tokens left
     if @index < @tokens.size && current_token.type != "eof"
       t = current_token
       raise ParseError.new(0, t.value.to_s, t.type, "Unexpected token: #{t.value}")
@@ -75,11 +74,11 @@ class Parser
     ParsedResult.new(expression, parsed)
   end
 
-  private def parse_expression_bp(min_bp : Int32) : ASTNode
+  private def parse_expression_bp(min_bp : Int32) : Node
     left = parse_null_denotation
     while @index < @tokens.size
       token = current_token
-      break if token.type == "eof" # Add explicit EOF check
+      break if token.type == "eof"
 
       current_bp = BINDING_POWER[token.type]? || 0
       break if current_bp <= min_bp
@@ -89,55 +88,67 @@ class Parser
     left
   end
 
-  private def parse_null_denotation : ASTNode
+  private def parse_null_denotation : Node
     token = advance
     case token.type
-    when "literal"             then literal(token.value)
-    when "unquoted_identifier" then field(token.value)
-    when "quoted_identifier"   then quoted_field(token)
-    when "star"                then star_projection
-    when "filter"              then nud_filter_projection
-    when "lbrace"              then parse_multi_select_hash
-    when "lparen"              then parse_paren_expression
-    when "flatten"             then nud_flatten_projection
-    when "current"             then current_node
-    when "expref"              then expref_expression
-    when "lbracket"            then parse_bracket_expression
-    when "not"                 then not_expression
+    when "literal"
+      LiteralNode.new(token.json_value || JSON::Any.new(nil))
+    when "unquoted_identifier"
+      FieldNode.new(token.value.to_s)
+    when "quoted_identifier"
+      parse_quoted_field(token)
+    when "star"
+      parse_star_projection
+    when "filter"
+      parse_nud_filter_projection
+    when "lbrace"
+      parse_multi_select_hash
+    when "lparen"
+      parse_paren_expression
+    when "flatten"
+      parse_nud_flatten_projection
+    when "current"
+      CurrentNode.new
+    when "expref"
+      parse_expref_expression
+    when "lbracket"
+      parse_bracket_expression
+    when "not"
+      parse_not_expression
     else
       raise ParseError.new(0, token.value.to_s, token.type, "Unexpected token: #{token.type}")
     end
   end
 
-  private def parse_left_denotation(left : ASTNode, token : Token) : ASTNode
+  private def parse_left_denotation(left : Node, token : Token) : Node
     case token.type
     when "dot"  then parse_dot(left)
-    when "pipe" then pipe_expression(left)
-    when "or"   then or_expression(left)
-    when "and"  then and_expression(left)
+    when "pipe" then parse_pipe_expression(left)
+    when "or"   then parse_or_expression(left)
+    when "and"  then parse_and_expression(left)
     when "eq", "ne", "gt", "lt", "gte", "lte"
-      comparator_expression(left, token.type)
-    when "flatten"  then led_flatten_projection(left)
+      parse_comparator_expression(left, token.type)
+    when "flatten"  then parse_led_flatten_projection(left)
     when "lbracket" then parse_bracket_operation(left)
-    when "lparen"   then function_expression(left)
-    when "filter"   then led_filter_projection(left)
+    when "lparen"   then parse_function_expression(left)
+    when "filter"   then parse_led_filter_projection(left)
     else
       raise ParseError.new(0, token.value.to_s, token.type, "Unexpected left token: #{token.type}")
     end
   end
 
-  private def parse_dot(left : ASTNode) : ASTNode
+  private def parse_dot(left : Node) : Node
     if lookahead(0) == "star"
       @index += 1
       right = parse_projection_rhs(BINDING_POWER["star"])
-      value_projection(left, right)
+      ValueProjectionNode.new(left, right)
     else
       right = parse_dot_rhs(BINDING_POWER["dot"])
-      subexpression([left, right]) # Changed to pass array of nodes
+      SubexpressionNode.new(left, right)
     end
   end
 
-  private def parse_dot_rhs(bp : Int32) : ASTNode
+  private def parse_dot_rhs(bp : Int32) : Node
     case lookahead(0)
     when "unquoted_identifier", "quoted_identifier", "star"
       parse_expression_bp(bp)
@@ -152,81 +163,54 @@ class Parser
     end
   end
 
-  private def parse_bracket_expression : ASTNode
+  private def parse_bracket_expression : Node
     if ["number", "colon"].includes?(lookahead(0))
-      index_expression([parse_index_expression])
-      # If we see star followed by rbracket => it's a projection from identity
+      IndexExpressionNode.new([parse_index_expression])
     elsif lookahead(0) == "star" && lookahead(1) == "rbracket"
       advance # consume 'star'
       advance # consume 'rbracket'
-      # Now parse the RHS of the projection
       right = parse_projection_rhs(BINDING_POWER["star"])
-      # Return a projection node from 'identity' to whatever 'right' is
-      projection(identity, right)
+      ProjectionNode.new(IdentityNode.new, right)
     else
-      # Otherwise, it's a multi-select-list
       parse_multi_select_list
     end
   end
 
-  private def parse_index_expression : ASTNode
-    # Check if we're looking at a slice or simple index
+  private def parse_index_expression : Node
     if lookahead(0) == "colon" || lookahead(1) == "colon"
       parse_slice
     else
-      # Simple index case like [1]
       index_token = current_token
       match("number")
       index_value = index_token.value.as(Int32)
       match("rbracket")
-      index(index_value)
+      IndexNode.new(index_value)
     end
   end
 
-  private def parse_bracket_operation(left : ASTNode) : ASTNode
+  private def parse_bracket_operation(left : Node) : Node
     if ["number", "colon"].includes?(lookahead(0))
       right = parse_index_expression
-      # Check if we got a slice or index
       if right.type == "slice"
-        projection(
-          index_expression([left, right]),
-          identity
+        ProjectionNode.new(
+          IndexExpressionNode.new([left, right]),
+          IdentityNode.new
         )
       else
-        index_expression([left, right])
+        IndexExpressionNode.new([left, right])
       end
+    elsif current_token.type == "star"
+      @index += 1 # consume star
+      match("rbracket")
+      right = parse_projection_rhs(BINDING_POWER["star"])
+      ProjectionNode.new(left, right)
     else
-      if current_token.type == "star"
-        @index += 1 # consume star
-        match("rbracket")
-        if lookahead(0) == "dot"
-          @index += 1 # consume dot
-          right = parse_dot_rhs(BINDING_POWER["dot"])
-          # Create direct projection instead of wrapping in subexpression
-          projection(left, right)
-        else
-          projection(left, identity)
-        end
-      else
-        raise ParseError.new(0, current_token.value.to_s,
-          current_token.type, "Invalid bracket operation")
-      end
+      raise ParseError.new(0, current_token.value.to_s,
+        current_token.type, "Invalid bracket operation")
     end
   end
 
-  private def project_if_slice(left : ASTNode, right : ASTNode) : ASTNode
-    if right.type == "slice"
-      # Create proper projection with AST module's index_expression
-      projection(
-        index_expression([left, right]),
-        identity
-      )
-    else
-      index_expression([left, right])
-    end
-  end
-
-  private def parse_slice : ASTNode
+  private def parse_slice : Node
     parts = [nil, nil, nil] of Int32?
     index = 0
 
@@ -244,48 +228,40 @@ class Parser
     end
     match("rbracket")
 
-    # Convert to AST nodes with proper null handling
-    start = parts[0] ? literal(parts[0]) : literal(nil)
-    _end = parts[1] ? literal(parts[1]) : literal(nil)
-    step = parts[2] ? literal(parts[2]) : literal(nil)
-
-    slice(start, _end, step)
+    SliceNode.new(parts[0], parts[1], parts[2])
   end
 
-  private def parse_multi_select_list : ASTNode
-    expressions = [] of ASTNode
+  private def parse_multi_select_list : Node
+    expressions = [] of Node
     while current_token.type != "rbracket"
       expressions << parse_expression_bp(0)
       match("comma") if current_token.type == "comma"
     end
     match("rbracket")
-    multi_select_list(expressions)
+    MultiSelectListNode.new(expressions)
   end
 
-  private def parse_multi_select_hash : ASTNode
-    pairs = [] of ASTNode
+  private def parse_multi_select_hash : Node
+    pairs = [] of KeyValPairNode
     while current_token.type != "rbrace"
       key_token = current_token
       match(["quoted_identifier", "unquoted_identifier"])
       match("colon")
       value = parse_expression_bp(0)
-      pairs << key_val_pair(key_token.value.to_s, value)
+      pairs << KeyValPairNode.new(key_token.value.to_s, value)
       match("comma") if current_token.type == "comma"
     end
     match("rbrace")
-    multi_select_dict(pairs)
+    MultiSelectHashNode.new(pairs)
   end
 
-  private def parse_projection_rhs(bp : Int32) : ASTNode
-    # Same approach as python's _parse_projection_rhs:
-    # If next token's binding power < 10, we stop the projection => identity
+  private def parse_projection_rhs(bp : Int32) : Node
     if (BINDING_POWER[current_token.type]? || 0) < PROJECTION_STOP
-      return identity
+      return IdentityNode.new
     end
 
     case current_token.type
     when "lbracket"
-      # e.g. foo[][0], or foo[][1:2], etc.
       parse_expression_bp(bp)
     when "filter"
       parse_expression_bp(bp)
@@ -325,13 +301,10 @@ class Parser
     token
   end
 
-  private def quoted_field(token : Token) : ASTNode
-    # Create field node with token value
-    field_node = field(token.value)
+  private def parse_quoted_field(token : Token) : Node
+    field_node = FieldNode.new(token.value.to_s)
 
-    # Check if next token is left parenthesis (function call)
     if current_token.type == "lparen"
-      # Look at current token for error message
       t = current_token
       raise ParseError.new(
         0,
@@ -344,88 +317,83 @@ class Parser
     field_node
   end
 
-  private def star_projection : ASTNode
-    left = identity
+  private def parse_star_projection : Node
+    left = IdentityNode.new
     right = if current_token.type == "rbracket"
-              identity
+              IdentityNode.new
             else
               parse_projection_rhs(BINDING_POWER["star"])
             end
-    value_projection(left, right)
+    ValueProjectionNode.new(left, right)
   end
 
-  private def nud_filter_projection : ASTNode
-    # Filter starting from identity node
-    led_filter_projection(identity)
+  private def parse_nud_filter_projection : Node
+    parse_led_filter_projection(IdentityNode.new)
   end
 
-  private def led_filter_projection(left : ASTNode) : ASTNode
-    # Parse filter condition
+  private def parse_led_filter_projection(left : Node) : Node
     condition = parse_expression_bp(0)
     match("rbracket")
 
-    # Determine right side of projection
     right = if current_token.type == "flatten"
-              identity
+              IdentityNode.new
             else
               parse_projection_rhs(BINDING_POWER["filter"])
             end
 
-    # Create filter projection node
-    filter_projection(left, right, condition)
+    FilterProjectionNode.new(left, right, condition)
   end
 
-  private def parse_paren_expression : ASTNode
+  private def parse_paren_expression : Node
     expr = parse_expression_bp(0)
-    match("rparen") # This consumes the closing ")"
+    match("rparen")
     expr
   end
 
-  private def nud_flatten_projection : ASTNode
-    flatten_node = flatten(identity)
+  private def parse_nud_flatten_projection : Node
+    flatten_node = FlattenNode.new(IdentityNode.new)
     right = parse_projection_rhs(BINDING_POWER["flatten"])
-    projection(flatten_node, right)
+    ProjectionNode.new(flatten_node, right)
   end
 
-  private def expref_expression
-    raise "Not implemented: expref_expression"
+  private def parse_expref_expression : Node
+    expr = parse_expression_bp(BINDING_POWER["expref"])
+    ExprefNode.new(expr)
   end
 
-  private def not_expression
+  private def parse_not_expression : Node
     expr = parse_expression_bp(BINDING_POWER["not"])
-    not_expression(expr)
+    NotExpressionNode.new(expr)
   end
 
-  private def pipe_expression(left : ASTNode)
+  private def parse_pipe_expression(left : Node) : Node
     right = parse_expression_bp(BINDING_POWER["pipe"])
-    pipe(left, right)
+    PipeNode.new(left, right)
   end
 
-  private def or_expression(left : ASTNode)
+  private def parse_or_expression(left : Node) : Node
     right = parse_expression_bp(BINDING_POWER["or"])
-    or_expression(left, right)
+    OrExpressionNode.new(left, right)
   end
 
-  private def and_expression(left : ASTNode)
+  private def parse_and_expression(left : Node) : Node
     right = parse_expression_bp(BINDING_POWER["and"])
-    and_expression(left, right)
+    AndExpressionNode.new(left, right)
   end
 
-  private def comparator_expression(left : ASTNode, comparator : String)
+  private def parse_comparator_expression(left : Node, comparator : String) : Node
     right = parse_expression_bp(BINDING_POWER[comparator])
-    comparator(comparator, left, right)
+    ComparatorNode.new(comparator, left, right)
   end
 
-  private def led_flatten_projection(left : ASTNode) : ASTNode
-    flatten_node = flatten(left)
+  private def parse_led_flatten_projection(left : Node) : Node
+    flatten_node = FlattenNode.new(left)
     right = parse_projection_rhs(BINDING_POWER["flatten"])
-    projection(flatten_node, right)
+    ProjectionNode.new(flatten_node, right)
   end
 
-  private def function_expression(left : ASTNode) : ASTNode
-    # Verify left node is a field type
+  private def parse_function_expression(left : Node) : Node
     unless left.type == "field"
-      # Look at the token two positions back for error message
       prev_token = @tokens[@index - 2]?
       raise ParseError.new(
         0,
@@ -435,23 +403,17 @@ class Parser
       )
     end
 
-    # Get function name from field node
     name = left.value.to_s
-    args = [] of ASTNode
+    args = [] of Node
 
-    # Parse arguments until we hit closing parenthesis
     while current_token.type != "rparen"
-      # Parse each argument expression
       expression = parse_expression_bp(0)
-      # If we see a comma, consume it and continue
       match("comma") if current_token.type == "comma"
       args << expression
     end
 
-    # Consume the closing parenthesis
     match("rparen")
 
-    # Create and return function node
-    function_expression(name, args)
+    FunctionExpressionNode.new(name, args)
   end
 end

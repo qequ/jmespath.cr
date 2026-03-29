@@ -7,15 +7,16 @@ struct Token
   property value : Char | Int32 | String | Nil
   property start : Char | Int32 | String | Nil
   property end : Char | Int32 | String | Nil
+  property json_value : JSON::Any?
 
   NULL_TOKEN = Token.new("eof", "", nil, nil)
 
-  def initialize(@type, @value, @start, @end)
+  def initialize(@type, @value, @start, @end, @json_value = nil)
   end
 end
 
 class Lexer
-  property current : Char? # @current can be a Char or Nil, initialized later
+  property current : Char?
   property expression : String = ""
   property chars : Array(Char) = [] of Char
   property position : Int32 = 0
@@ -57,47 +58,43 @@ class Lexer
     tokens = [] of Token
     while @current
       if SIMPLE_TOKENS.keys.includes?(@current)
-        token = token(@current, SIMPLE_TOKENS[@current]).tap { next_char }
+        tok = Token.new(SIMPLE_TOKENS[@current.not_nil!], @current, @position, @position + 1)
+        next_char
+        tokens << tok
       elsif START_IDENTIFIER.includes?(@current)
-        token = identifier
+        tokens << identifier
       elsif WHITESPACE.includes?(@current)
         next_char
-        token = nil
       elsif @current == '['
-        token = handle_bracket
-      elsif @current == "'"
-        token = consume_raw_string_literal
+        tokens << handle_bracket
+      elsif @current == '\''
+        tokens << consume_raw_string_literal
       elsif @current == '|'
-        token = match_or_else('|', "or", "pipe")
+        tokens << match_or_else('|', "or", "pipe")
       elsif @current == '&'
-        token = match_or_else('&', "and", "expref")
+        tokens << match_or_else('&', "and", "expref")
       elsif @current == '<'
-        token = match_or_else('=', "lte", "lt")
+        tokens << match_or_else('=', "lte", "lt")
       elsif @current == '>'
-        token = match_or_else('=', "gte", "gt")
+        tokens << match_or_else('=', "gte", "gt")
       elsif @current == '!'
-        token = match_or_else('=', "ne", "not")
+        tokens << match_or_else('=', "ne", "not")
       elsif @current == '='
-        token = equal_sign
+        tokens << equal_sign
       elsif @current == '`'
-        token = consume_literal
+        tokens << consume_literal
       elsif VALID_NUMBER.includes?(@current)
-        token = number
+        tokens << number
       elsif @current == '-'
-        token = negative_number
+        tokens << negative_number
       elsif @current == '"'
-        token = consume_quoted_identifier
+        tokens << consume_quoted_identifier
       else
         raise LexerError.new(@position, @current.to_s, "Unknown token #{@current}")
       end
-      tokens << Token.new(token["type"].to_s, token["value"], token["start"], token["end"]) if token
     end
     tokens << Token::NULL_TOKEN unless tokens.empty? || tokens.last.type == "eof"
     tokens
-  end
-
-  private def token(value, type)
-    {"type" => type, "value" => value, "start" => @position, "end" => @position + 1}
   end
 
   private def next_char : Char?
@@ -110,7 +107,7 @@ class Lexer
     @current
   end
 
-  private def identifier : Hash(String, String | Int32)
+  private def identifier : Token
     start = @position
     buffer = String.build do |str|
       str << @current.to_s
@@ -120,21 +117,21 @@ class Lexer
         next_char
       end
     end
-    {"type" => "unquoted_identifier", "value" => buffer, "start" => start, "end" => @position}
+    Token.new("unquoted_identifier", buffer, start, @position)
   end
 
-  private def handle_bracket : Hash(String, String | Int32)
+  private def handle_bracket : Token
     start = @position
     next_char
     case @current
     when ']'
       next_char
-      {"type" => "flatten", "value" => "[]", "start" => start, "end" => @position}
+      Token.new("flatten", "[]", start, @position)
     when '?'
       next_char
-      {"type" => "filter", "value" => "[?", "start" => start, "end" => @position}
+      Token.new("filter", "[?", start, @position)
     else
-      {"type" => "lbracket", "value" => "[", "start" => start, "end" => @position}
+      Token.new("lbracket", "[", start, @position)
     end
   end
 
@@ -159,18 +156,17 @@ class Lexer
     buffer.to_s
   end
 
-  private def consume_raw_string_literal : Hash(String, String | Int32)
+  private def consume_raw_string_literal : Token
     start = @position
     buffer = consume_until('\'')
-    {"type" => "literal", "value" => buffer, "start" => start, "end" => @position}
+    Token.new("literal", buffer, start, @position, JSON::Any.new(buffer))
   end
 
-  private def consume_quoted_identifier : Hash(String, String | Int32)
+  private def consume_quoted_identifier : Token
     start = @position
     buffer = consume_until('"')
     begin
       parsed_value = JSON.parse(%Q["#{buffer}"])
-      # Emsure the value is a string or Int32
       value = case parsed_value
               when JSON::Any
                 parsed_value.as_i? || parsed_value.as_s
@@ -178,49 +174,33 @@ class Lexer
                 parsed_value.to_s
               end
       raise LexerError.new(@position, buffer, "Invalid JSON value type") unless value
-      {"type" => "quoted_identifier", "value" => value, "start" => start, "end" => @position}
+      Token.new("quoted_identifier", value, start, @position)
     rescue ex : JSON::ParseException
       raise LexerError.new(@position, buffer, "Invalid JSON format: #{ex.message}")
     end
   end
 
-  private def parse_value(parsed_value)
-    case parsed_value
-    when JSON::Any
-      parsed_value.as_i? || parsed_value.as_s
-    else
-      parsed_value.to_s
-    end
-  end
-
-  private def consume_literal : Hash(String, String | Int32)
+  private def consume_literal : Token
     start = @position
     lexeme = consume_until('`')
     begin
-      parsed_value = JSON.parse(lexeme)
-      value = parse_value(parsed_value)
-      raise LexerError.new(@position, lexeme, "Invalid JSON value type") unless value
-      {"type" => "literal", "value" => value, "start" => start, "end" => @position}
+      parsed_json = JSON.parse(lexeme)
+      Token.new("literal", lexeme, start, @position, parsed_json)
     rescue ex : JSON::ParseException
-      # Invalid JSON values should be converted to quoted
-      # JSON strings during the JEP-12 deprecation period.
-      # call JSON.parse with the string wrapped in double quotes
-      parsed_value = JSON.parse(%Q["#{lexeme}"])
-      value = parse_value(parsed_value)
-      raise LexerError.new(@position, lexeme, "Invalid JSON format: #{ex.message}") unless value
-      {"type" => "quoted_identifier", "value" => value, "start" => start, "end" => @position}
+      # JEP-12 deprecation: invalid JSON values are treated as quoted strings
+      Token.new("literal", lexeme, start, @position, JSON::Any.new(lexeme))
     end
   end
 
-  private def match_or_else(expected : Char, match_type : String, else_type : String) : Hash(String, String | Int32)
+  private def match_or_else(expected : Char, match_type : String, else_type : String) : Token
     start = @position
     value = @current.to_s
     nc = next_char
     if nc == expected
       next_char
-      {"type" => match_type, "value" => "#{value}#{expected}", "start" => start, "end" => @position}
+      Token.new(match_type, "#{value}#{expected}", start, @position)
     else
-      {"type" => else_type, "value" => value, "start" => start, "end" => start + 1}
+      Token.new(else_type, value, start, start + 1)
     end
   end
 
@@ -234,36 +214,31 @@ class Lexer
     buffer
   end
 
-  private def number : Hash(String, String | Int32)
+  private def number : Token
     start = @position
     number_string = consume_number
-    {"type" => "number", "value" => number_string.to_i, "start" => start, "end" => @position}
+    Token.new("number", number_string.to_i, start, @position)
   end
 
-  private def negative_number : Hash(String, String | Int32)
+  private def negative_number : Token
     start = @position
     next_char
     if VALID_NUMBER.includes?(@current)
       number_string = "-" + consume_number
-      {"type" => "number", "value" => number_string.to_i32, "start" => start, "end" => @position}
+      Token.new("number", number_string.to_i32, start, @position)
     else
       raise LexerError.new(@position, @current.to_s, "Unknown token '-'")
     end
   end
 
-  private def equal_sign : Hash(String, String | Int32)
+  private def equal_sign : Token
     start = @position
     if next_char == '='
       next_char
-      {"type" => "eq", "value" => "==", "start" => start, "end" => @position}
+      Token.new("eq", "==", start, @position)
     else
-      # If we're at the EOF, we never advanced the position
       position = @current.nil? ? @position : @position - 1
       raise LexerError.new(position, "=", "Unknown token '='")
     end
-  end
-
-  private def eof_token : Hash(String, String | Int32)
-    {"type" => "eof", "value" => "", "start" => @length, "end" => @length}
   end
 end
