@@ -1,15 +1,14 @@
-require "./visitor"
+require "./nodes"
 
 class ParsedResult
   property expression : String
-  property parsed : ASTNode
+  property parsed : Node
 
-  def initialize(@expression : String, @parsed : ASTNode)
+  def initialize(@expression : String, @parsed : Node)
   end
 
   def search(value : JSON::Any, options = nil) : JSON::Any
-    interpreter = TreeInterpreter.new(options)
-    interpreter.visit(@parsed, value)
+    @parsed.visit(value)
   end
 
   def to_s(io : IO) : Nil
