@@ -1,4 +1,5 @@
 require "json"
+require "./functions"
 
 # Base class for all AST nodes. Each node implements visit(value)
 # directly, using polymorphism instead of a central visitor dispatcher.
@@ -526,7 +527,7 @@ class FunctionExpressionNode < Node
   end
 
   def visit(v : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("Functions not yet implemented: #{@name}")
+    FunctionRuntime.invoke(@name, @args, v)
   end
 
   def type : String
@@ -543,11 +544,15 @@ class FunctionExpressionNode < Node
 end
 
 class ExprefNode < Node
+  getter expression : Node
+
   def initialize(@expression : Node)
   end
 
   def visit(v : JSON::Any) : JSON::Any
-    raise NotImplementedError.new("Expression references not yet implemented")
+    # Expression references are evaluated by FunctionRuntime,
+    # not visited directly. Return nil if used outside a function.
+    JSON::Any.new(nil)
   end
 
   def type : String

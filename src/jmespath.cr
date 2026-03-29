@@ -2,6 +2,7 @@ require "json"
 require "./lexer"
 require "./exceptions"
 require "./nodes"
+require "./functions"
 require "./parser"
 require "./parsed_result"
 
